@@ -1,12 +1,627 @@
 {
   "claims": [
     {
+      "id": "3d533133-5c38-4223-b046-e9d84b1459eb",
+      "claimNumber": "MC-NOVA-2026-0005",
+      "company": "Nova Carriers",
+      "createdAt": "2026-01-22T09:47:46.079Z",
+      "createdBy": "Kartik",
+      "updatedAt": "2026-01-22T12:37:06.678Z",
+      "progressStatus": "Notification Received",
+      "extraction": {
+        "rawText": "MV Batavia Express, oil spill at Rizhao port, 16 jan 2026. One crew injured.",
+        "summary": "MV Batavia Express, oil spill at Rizhao port, 16 jan 2026. One crew injured.",
+        "vesselName": "Batavia Express",
+        "imo": null,
+        "eventDateText": "16 jan 2026",
+        "locationText": null,
+        "incidentKeywords": [
+          "pollution",
+          "injury"
+        ],
+        "counterpartyText": null,
+        "incidentType": null,
+        "allegedCause": null,
+        "pilotInvolved": null,
+        "pollutionReported": null,
+        "injuriesReported": null,
+        "immediateActionsTaken": [],
+        "missingInfoToRequest": [],
+        "confidence": 0.45,
+        "warnings": [
+          "AI not used; rule-based fallback applied."
+        ]
+      },
+      "classification": {
+        "covers": [
+          {
+            "type": "P&I",
+            "confidence": 0.85,
+            "reasoning": "Likely involves third-party liabilities (e.g., contact/collision, injury, pollution, or damage to third-party property)."
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A1",
+          "title": "Create claim file and preserve evidence",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:47:46.079Z",
+          "status": "DONE",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T12:00:49.525Z",
+          "reminderAt": null,
+          "notes": "Marked done from UI"
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A2",
+          "title": "Confirm cover(s) and notify relevant insurers/club",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:47:46.079Z",
+          "status": "DONE",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T12:27:38.822Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A3",
+          "title": "Collect supporting documents (log extracts, photos, reports)",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T09:47:46.079Z",
+          "status": "DONE",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T12:37:06.678Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A4",
+          "title": "Appoint / confirm surveyor (if required)",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:47:46.079Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T09:47:46.079Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A5",
+          "title": "Establish initial reserve (estimate) and deductible impact",
+          "ownerRole": "Finance",
+          "dueAt": "2026-01-24T09:47:46.079Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T09:47:46.079Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A6",
+          "title": "Track updates and maintain status log",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:47:46.079Z",
+          "status": "DONE",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T12:02:49.152Z",
+          "reminderAt": null,
+          "notes": "Marked done from UI"
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A7",
+          "title": "Identify third-party involvement and liability exposure",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:47:46.079Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T09:47:46.079Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A8",
+          "title": "Obtain statements (Master/crew) and incident report",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T09:47:46.079Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T09:47:46.079Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "3d533133-5c38-4223-b046-e9d84b1459eb-A9",
+          "title": "Notify relevant correspondents / local agents if needed",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:47:46.079Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:47:46.079Z",
+          "updatedAt": "2026-01-22T09:47:46.079Z",
+          "reminderAt": null,
+          "notes": ""
+        }
+      ],
+      "finance": {
+        "currency": "USD",
+        "reserveEstimated": 500000,
+        "deductible": 30000,
+        "recovered": 266000,
+        "outstanding": 234000,
+        "notes": "Partial"
+      },
+      "files": [],
+      "statusLog": [
+        {
+          "at": "2026-01-22T09:47:46.079Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Claim created from first notification."
+        }
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-01-22T09:47:46.079Z",
+          "by": "Kartik",
+          "action": "STATUS_LOG_IMPORTED",
+          "note": "Notification Received - Claim created from first notification."
+        },
+        {
+          "at": "2026-01-22T09:48:50.459Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=400000, recovered=0, outstanding=400000)"
+        },
+        {
+          "at": "2026-01-22T09:49:09.325Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=400000, recovered=200000, outstanding=200000)"
+        },
+        {
+          "at": "2026-01-22T12:00:49.525Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Create claim file and preserve evidence (status=DONE)"
+        },
+        {
+          "at": "2026-01-22T12:02:49.152Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Track updates and maintain status log (status=DONE)"
+        },
+        {
+          "at": "2026-01-22T12:03:19.905Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=400000, recovered=266000, outstanding=134000)"
+        },
+        {
+          "at": "2026-01-22T12:27:38.822Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Confirm cover(s) and notify relevant insurers/club (status=DONE)"
+        },
+        {
+          "at": "2026-01-22T12:33:38.820Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=500000, recovered=266000, outstanding=234000)"
+        },
+        {
+          "at": "2026-01-22T12:37:06.678Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Collect supporting documents (log extracts, photos, reports) (status=DONE)"
+        }
+      ]
+    },
+    {
+      "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28",
+      "claimNumber": "MC-NOVA-2026-0004",
+      "company": "Nova Carriers",
+      "createdAt": "2026-01-22T09:46:44.081Z",
+      "createdBy": "Kartik",
+      "updatedAt": "2026-01-22T12:30:56.960Z",
+      "progressStatus": "Notification Received",
+      "extraction": {
+        "rawText": "Batavia express collision at Singapore 22 jan 2026",
+        "summary": "Batavia express collision at Singapore 22 jan 2026",
+        "vesselName": null,
+        "imo": null,
+        "eventDateText": "22 jan 2026",
+        "locationText": null,
+        "incidentKeywords": [
+          "collision"
+        ],
+        "counterpartyText": null,
+        "incidentType": null,
+        "allegedCause": null,
+        "pilotInvolved": null,
+        "pollutionReported": null,
+        "injuriesReported": null,
+        "immediateActionsTaken": [],
+        "missingInfoToRequest": [],
+        "confidence": 0.45,
+        "warnings": [
+          "AI not used; rule-based fallback applied."
+        ]
+      },
+      "classification": {
+        "covers": [
+          {
+            "type": "P&I",
+            "confidence": 0.85,
+            "reasoning": "Likely involves third-party liabilities (e.g., contact/collision, injury, pollution, or damage to third-party property)."
+          },
+          {
+            "type": "H&M",
+            "confidence": 0.7,
+            "reasoning": "Potential physical damage to the insured vessel / machinery, typically responded under Hull & Machinery, subject to deductible and policy terms."
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A1",
+          "title": "Create claim file and preserve evidence",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:46:44.081Z",
+          "status": "DONE",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T12:29:42.000Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A2",
+          "title": "Confirm cover(s) and notify relevant insurers/club",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A3",
+          "title": "Collect supporting documents (log extracts, photos, reports)",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A4",
+          "title": "Appoint / confirm surveyor (if required)",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A5",
+          "title": "Establish initial reserve (estimate) and deductible impact",
+          "ownerRole": "Finance",
+          "dueAt": "2026-01-24T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A6",
+          "title": "Track updates and maintain status log",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A7",
+          "title": "Identify third-party involvement and liability exposure",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A8",
+          "title": "Obtain statements (Master/crew) and incident report",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "e8d7ca11-2ac2-4d3b-8a82-d75d72f1aa28-A9",
+          "title": "Notify relevant correspondents / local agents if needed",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T09:46:44.081Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T09:46:44.081Z",
+          "updatedAt": "2026-01-22T09:46:44.081Z",
+          "reminderAt": null,
+          "notes": ""
+        }
+      ],
+      "finance": {
+        "currency": "USD",
+        "reserveEstimated": 1000000,
+        "deductible": 0,
+        "recovered": 0,
+        "outstanding": 1000000,
+        "notes": ""
+      },
+      "files": [],
+      "statusLog": [
+        {
+          "at": "2026-01-22T09:46:44.081Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Claim created from first notification."
+        },
+        {
+          "at": "2026-01-22T09:46:59.146Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Progress updated"
+        },
+        {
+          "at": "2026-01-22T12:29:34.047Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Progress updated"
+        },
+        {
+          "at": "2026-01-22T12:29:44.517Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Progress updated"
+        }
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-01-22T09:46:44.081Z",
+          "by": "Kartik",
+          "action": "STATUS_LOG_IMPORTED",
+          "note": "Notification Received - Claim created from first notification."
+        },
+        {
+          "at": "2026-01-22T09:46:59.146Z",
+          "by": "Kartik",
+          "action": "STATUS_UPDATED",
+          "note": "Progress set to: Notification Received"
+        },
+        {
+          "at": "2026-01-22T12:29:34.047Z",
+          "by": "Kartik",
+          "action": "STATUS_UPDATED",
+          "note": "Progress set to: Notification Received"
+        },
+        {
+          "at": "2026-01-22T12:29:42.000Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Create claim file and preserve evidence (status=DONE)"
+        },
+        {
+          "at": "2026-01-22T12:29:44.517Z",
+          "by": "Kartik",
+          "action": "STATUS_UPDATED",
+          "note": "Progress set to: Notification Received"
+        },
+        {
+          "at": "2026-01-22T12:30:56.960Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=1000000, recovered=0, outstanding=1000000)"
+        }
+      ]
+    },
+    {
+      "id": "2969d479-425c-4540-a1c7-3ba28fbc1115",
+      "claimNumber": "MC-NOVA-2026-0003",
+      "company": "Nova Carriers",
+      "createdAt": "2026-01-22T08:17:28.270Z",
+      "createdBy": "Kartik",
+      "updatedAt": "2026-01-22T08:25:16.637Z",
+      "progressStatus": "Notification Received",
+      "extraction": {
+        "rawText": "FWD: URGENT / Re: NOVA STAR incident\n\nYesterday night during unberthing, vessel touched fender and berth. Small dent at frame 72 stbd. Pilot onboard, tug line slack. No spill observed. Terminal asking for damage survey. Please advise Club notification & surveyor appointment.\n\nSent from iPhone",
+        "summary": "FWD: URGENT / Re: NOVA STAR incident\n\nYesterday night during unberthing, vessel touched fender and berth. Small dent at frame 72 stbd. Pilot onboard, tug line slack. No spill observed. Terminal asking for damage survey. Please advise Club notification & surveyor appointment.\n\nSent from iPhone",
+        "vesselName": null,
+        "imo": null,
+        "eventDateText": null,
+        "locationText": null,
+        "incidentKeywords": [
+          "contact",
+          "pollution"
+        ],
+        "counterpartyText": null,
+        "incidentType": null,
+        "allegedCause": null,
+        "pilotInvolved": null,
+        "pollutionReported": null,
+        "injuriesReported": null,
+        "immediateActionsTaken": [],
+        "missingInfoToRequest": [],
+        "confidence": 0.45,
+        "warnings": [
+          "AI not used; rule-based fallback applied."
+        ]
+      },
+      "classification": {
+        "covers": [
+          {
+            "type": "P&I",
+            "confidence": 0.85,
+            "reasoning": "Likely involves third-party liabilities (e.g., contact/collision, injury, pollution, or damage to third-party property)."
+          },
+          {
+            "type": "H&M",
+            "confidence": 0.7,
+            "reasoning": "Potential physical damage to the insured vessel / machinery, typically responded under Hull & Machinery, subject to deductible and policy terms."
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A1",
+          "title": "Create claim file and preserve evidence",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A2",
+          "title": "Confirm cover(s) and notify relevant insurers/club",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A3",
+          "title": "Collect supporting documents (log extracts, photos, reports)",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:25:16.637Z",
+          "reminderAt": "2026-01-23T09:00:00.000Z",
+          "notes": "Chase docs (test reminder)"
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A4",
+          "title": "Appoint / confirm surveyor (if required)",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A5",
+          "title": "Establish initial reserve (estimate) and deductible impact",
+          "ownerRole": "Finance",
+          "dueAt": "2026-01-24T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A6",
+          "title": "Track updates and maintain status log",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A7",
+          "title": "Identify third-party involvement and liability exposure",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A8",
+          "title": "Obtain statements (Master/crew) and incident report",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "2969d479-425c-4540-a1c7-3ba28fbc1115-A9",
+          "title": "Notify relevant correspondents / local agents if needed",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T08:17:28.270Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T08:17:28.270Z",
+          "updatedAt": "2026-01-22T08:17:28.270Z",
+          "reminderAt": null,
+          "notes": ""
+        }
+      ],
+      "finance": {
+        "currency": "USD",
+        "reserveEstimated": 0,
+        "deductible": 0,
+        "recovered": 0,
+        "outstanding": 0,
+        "notes": ""
+      },
+      "files": [],
+      "statusLog": [
+        {
+          "at": "2026-01-22T08:17:28.270Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Claim created from first notification."
+        }
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-01-22T08:17:28.270Z",
+          "by": "Kartik",
+          "action": "STATUS_LOG_IMPORTED",
+          "note": "Notification Received - Claim created from first notification."
+        },
+        {
+          "at": "2026-01-22T08:25:16.637Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Collect supporting documents (log extracts, photos, reports) (status=OPEN)"
+        }
+      ]
+    },
+    {
       "id": "759649c9-fe24-4ab3-aa31-7966bb0ba032",
       "claimNumber": "MC-NOVA-2026-0002",
       "company": "Nova Carriers",
       "createdAt": "2026-01-22T05:43:33.633Z",
       "createdBy": "Kartik",
-      "updatedAt": "2026-01-22T07:52:08.738Z",
+      "updatedAt": "2026-01-22T08:20:56.799Z",
       "progressStatus": "Insurers Notified",
       "extraction": {
         "rawText": "Vessel: MV NOVA STAR\nIMO: 1234567\n22 Jan 2026\nPosition: Singapore Anchorage\nIncident: Contact with berth during manoeuvring. Minor denting to shell plating. No pollution. Pilot involved. Please advise appointing surveyor and notify P&I.",
@@ -60,9 +675,9 @@
           "dueAt": "2026-01-23T05:43:33.633Z",
           "status": "OPEN",
           "createdAt": "2026-01-22T05:43:33.633Z",
-          "updatedAt": "2026-01-22T07:52:08.738Z",
-          "reminderAt": "2026-01-29T06:00:00.000Z",
-          "notes": "Reminder test: set to due"
+          "updatedAt": "2026-01-22T08:20:56.799Z",
+          "reminderAt": "2026-01-23T09:00:00.000Z",
+          "notes": "Chase documents tomorrow"
         },
         {
           "id": "759649c9-fe24-4ab3-aa31-7966bb0ba032-A4",
@@ -190,6 +805,12 @@
           "by": "Kartik",
           "action": "REMINDER_SNOOZED",
           "note": "Reminder snoozed by 7 day(s) for action: Collect supporting documents (log extracts, photos, reports)"
+        },
+        {
+          "at": "2026-01-22T08:20:56.799Z",
+          "by": "Kartik",
+          "action": "ACTION_UPDATED",
+          "note": "Action updated: Collect supporting documents (log extracts, photos, reports) (status=OPEN)"
         }
       ]
     },

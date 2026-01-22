@@ -1,18 +1,151 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { use as usePromise, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
-export default function ClaimDetailPage() {
-  const params = useParams();
-  const claimId = params?.id;
+function money(n) {
+  const x = Number(n || 0);
+  return x.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function isoNow() {
+  return new Date().toISOString();
+}
+
+function safe(v, fallback = "—") {
+  if (v === null || v === undefined) return fallback;
+  const s = String(v).trim();
+  return s.length ? s : fallback;
+}
+
+function copyToClipboard(text) {
+  if (!text) return;
+  navigator.clipboard?.writeText(text);
+}
+
+function buildDraftsFromClaim(claim) {
+  const cn = safe(claim?.claimNumber, "MC-UNKNOWN");
+  const company = safe(claim?.company, "Nova Carriers");
+  const createdBy = safe(claim?.createdBy, "Claims Team");
+
+  const ex = claim?.extraction || {};
+  const vessel = safe(ex?.vesselName || claim?.vesselName, "—");
+  const imo = safe(ex?.imo, "—");
+  const dt = safe(ex?.eventDateText, "—");
+  const loc = safe(ex?.locationText, "—");
+  const raw = safe(ex?.rawText, "");
+
+  const header = `Claim Ref: ${cn}\nVessel: ${vessel}${imo !== "—" ? ` (IMO ${imo})` : ""}\nDate/Time (as advised): ${dt}\nLocation/Position: ${loc}`;
+  const incidentBlock = raw ? `Initial description (as received):\n${raw}` : "Initial description: (not provided)";
+  const preserve =
+    `Evidence / documents to preserve:\n` +
+    `- Photos/videos\n` +
+    `- Deck/engine log extracts\n` +
+    `- Pilot card / passage plan / VDR (as applicable)\n` +
+    `- Statements (Master/crew)\n` +
+    `- Port/terminal correspondence\n` +
+    `- Damage report / repair quotation\n` +
+    `- SOF / time records if delays arise`;
+
+  const drafts = [];
+
+  drafts.push({
+    type: "P&I_NOTIFICATION",
+    title: "P&I — Initial Notification",
+    subject: `[${cn}] - ${vessel} - P&I Notification (Initial)`,
+    body:
+      `Dear P&I Club / Correspondents,\n\n` +
+      `We hereby give initial notification of an incident that may give rise to liabilities and/or costs falling within P&I cover.\n\n` +
+      `${header}\n\n` +
+      `${incidentBlock}\n\n` +
+      `Immediate actions taken / proposed:\n` +
+      `- Evidence preservation initiated\n` +
+      `- Please advise recommended next steps and whether surveyor/correspondent attendance is required\n` +
+      `- Please confirm any specific reporting format / documents required\n\n` +
+      `${preserve}\n\n` +
+      `Kindly acknowledge receipt and advise course of action.\n\n` +
+      `Best regards,\n${company}\n(${createdBy})`,
+  });
+
+  drafts.push({
+    type: "H&M_NOTICE",
+    title: "H&M — Notice of Damage / Claim Intimation",
+    subject: `[${cn}] - ${vessel} - H&M Notice of Damage (Initial)`,
+    body:
+      `Dear Hull & Machinery Underwriters / Brokers,\n\n` +
+      `We hereby give notice of an occurrence that may result in damage and/or costs falling within H&M cover (subject to policy terms, deductible and exclusions).\n\n` +
+      `${header}\n\n` +
+      `${incidentBlock}\n\n` +
+      `Present understanding of damage (initial):\n` +
+      `- (Describe: e.g., denting to shell plating / fender contact / scrape marks)\n` +
+      `- No further details at this stage (survey pending)\n\n` +
+      `Actions requested:\n` +
+      `- Please acknowledge notice\n` +
+      `- Please advise surveyor appointment (if required) and any reporting requirements\n\n` +
+      `${preserve}\n\n` +
+      `Best regards,\n${company}\n(${createdBy})`,
+  });
+
+  drafts.push({
+    type: "SURVEYOR_APPOINTMENT",
+    title: "Surveyor — Appointment Request",
+    subject: `[${cn}] - ${vessel} - Survey Appointment Request`,
+    body:
+      `Dear Sir/Madam,\n\n` +
+      `${company} requests your attendance / appointment as surveyor in relation to the below incident.\n\n` +
+      `${header}\n\n` +
+      `${incidentBlock}\n\n` +
+      `Please confirm:\n` +
+      `1) Earliest attendance and ETA\n` +
+      `2) Information/documents required prior attendance\n` +
+      `3) Expected deliverables and timeline for preliminary and final report\n\n` +
+      `We will provide photographs, statements, and relevant extracts upon confirmation.\n\n` +
+      `Best regards,\n${company}\n(${createdBy})`,
+  });
+
+  drafts.push({
+    type: "BERTH_DAMAGE_NOTICE",
+    title: "Terminal/Port — Berth / Fender Contact Notice",
+    subject: `[${cn}] - ${vessel} - Notice of Incident (Berth/Terminal Contact)`,
+    body:
+      `Dear Terminal / Port Authority,\n\n` +
+      `We refer to an incident involving ${vessel}${imo !== "—" ? ` (IMO ${imo})` : ""} on ${dt} at/near ${loc}.\n\n` +
+      `${incidentBlock}\n\n` +
+      `At this stage, our understanding is preliminary and subject to investigation and survey.\n\n` +
+      `We request:\n` +
+      `- Copies of any CCTV footage / incident logs / berth records\n` +
+      `- Details of any alleged damage to berth/fender and repair estimates (if any)\n` +
+      `- Contact details for your appointed representative\n\n` +
+      `We will revert with further information once survey findings are available.\n\n` +
+      `Best regards,\n${company}\n(${createdBy})`,
+  });
+
+  drafts.push({
+    type: "CHASE_REMINDER",
+    title: "Chase — Follow-up Reminder",
+    subject: `[${cn}] - ${vessel} - Follow-up / Chase`,
+    body:
+      `Dear All,\n\n` +
+      `Gentle reminder / follow-up in relation to Claim Ref ${cn} (${vessel}).\n\n` +
+      `Pending item(s):\n- (e.g., survey attendance / preliminary report / final report / repair quotation / insurer feedback)\n\n` +
+      `Kindly provide an update and expected timeline.\n\n` +
+      `Best regards,\n${company}\n(${createdBy})`,
+  });
+
+  return drafts;
+}
+
+export default function ClaimDetailPage({ params }) {
+  // Next 16: params can be a Promise in client components
+  const p = params && typeof params.then === "function" ? usePromise(params) : params;
+  const claimId = p?.id;
 
   const [claim, setClaim] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [drafts, setDrafts] = useState([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [financeBusy, setFinanceBusy] = useState(false);
 
   const [progressStatus, setProgressStatus] = useState("");
   const [finance, setFinance] = useState({
@@ -23,537 +156,408 @@ export default function ClaimDetailPage() {
     notes: "",
   });
 
-  async function loadClaim() {
-    if (!claimId) return;
-    setLoading(true);
-    setErr("");
-    try {
-      const res = await fetch(`/api/claims/${claimId}`, { cache: "no-store" });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.message || "Failed to load claim");
+  const drafts = useMemo(() => {
+    if (!claim) return [];
+    return buildDraftsFromClaim(claim);
+  }, [claim]);
 
-      setClaim(json.data);
-      setProgressStatus(json.data.progressStatus || "");
+  async function load() {
+    if (!claimId) return;
+    setErr("");
+    setLoading(true);
+    try {
+      // IMPORTANT: use frontend API route (works on Vercel)
+      const r = await fetch(`/api/claims/${claimId}`, { cache: "no-store" });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.ok) throw new Error(data?.message || data?.error || `Claim load failed (HTTP ${r.status})`);
+      setClaim(data.data);
+
+      setProgressStatus(data.data?.progressStatus || "");
+      const f = data.data?.finance || {};
       setFinance({
-        currency: json.data.finance?.currency || "USD",
-        reserveEstimated: json.data.finance?.reserveEstimated || 0,
-        deductible: json.data.finance?.deductible || 0,
-        recovered: json.data.finance?.recovered || 0,
-        notes: json.data.finance?.notes || "",
+        currency: f.currency || "USD",
+        reserveEstimated: Number(f.reserveEstimated || 0),
+        deductible: Number(f.deductible || 0),
+        recovered: Number(f.recovered || 0),
+        notes: f.notes || "",
       });
     } catch (e) {
-      setErr(e.message || "Unexpected error");
+      setErr(e?.message || "Failed to load claim");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (!claimId) return;
-    loadClaim();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId]);
 
-  async function markActionDone(actionId) {
+  // NOTE: buttons below still call backend directly in earlier version.
+  // We will proxy PATCH routes next (Step 9C) so these work on Vercel too.
+  async function updateProgress() {
+    setStatusBusy(true);
     try {
-      const res = await fetch(`/api/claims/${claimId}/actions/${actionId}`, {
+      const r = await fetch(`/api/claims/${claimId}/progress`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          by: "Kartik",
-          status: "DONE",
-          notes: "Marked done from UI",
-        }),
+        body: JSON.stringify({ by: "Kartik", progressStatus: progressStatus || "Updated", at: isoNow() }),
       });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.message || "Failed to update action");
-      await loadClaim();
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.ok) throw new Error(data?.message || data?.error || `Progress update failed (HTTP ${r.status})`);
+      await load();
     } catch (e) {
-      alert(e.message || "Action update failed");
-    }
-  }
-
-  async function saveFinance() {
-    try {
-      const res = await fetch(`/api/claims/${claimId}/finance`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          by: "Kartik",
-          finance: {
-            currency: finance.currency,
-            reserveEstimated: Number(finance.reserveEstimated || 0),
-            deductible: Number(finance.deductible || 0),
-            recovered: Number(finance.recovered || 0),
-            notes: finance.notes || "",
-          },
-        }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.message || "Failed to update finance");
-      await loadClaim();
-      alert("Finance updated");
-    } catch (e) {
-      alert(e.message || "Finance update failed");
-    }
-  }
-
-  async function saveProgress() {
-    try {
-      const res = await fetch(`/api/claims/${claimId}/progress`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          by: "Kartik",
-          progressStatus,
-        }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.message || "Failed to update progress");
-      await loadClaim();
-      alert("Progress updated");
-    } catch (e) {
-      alert(e.message || "Progress update failed");
-    }
-  }
-
-  async function generateDrafts() {
-    setDrafts([]);
-    setDraftsLoading(true);
-    try {
-      const res = await fetch(`/api/claims/${claimId}/drafts`, { method: "POST" });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.message || "Failed to generate drafts");
-      setDrafts(json.data || []);
-    } catch (e) {
-      alert(e.message || "Draft generation failed");
+      alert(e?.message || "Failed to update progress");
     } finally {
-      setDraftsLoading(false);
+      setStatusBusy(false);
     }
   }
 
-  async function copyText(text) {
+  async function updateFinance() {
+    setFinanceBusy(true);
     try {
-      await navigator.clipboard.writeText(text);
-      alert("Copied");
-    } catch {
-      alert("Copy failed (browser permissions).");
+      const r = await fetch(`/api/claims/${claimId}/finance`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ by: "Kartik", finance }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.ok) throw new Error(data?.message || data?.error || `Finance update failed (HTTP ${r.status})`);
+      await load();
+    } catch (e) {
+      alert(e?.message || "Failed to update finance");
+    } finally {
+      setFinanceBusy(false);
     }
   }
 
-  if (!claimId) return <div style={styles.state}>Loading route…</div>;
-  if (loading) return <div style={styles.state}>Loading claim…</div>;
+  async function updateAction(actionId, patch) {
+    try {
+      const r = await fetch(`/api/claims/${claimId}/actions/${actionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ by: "Kartik", ...patch }),
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.ok) throw new Error(data?.message || data?.error || `Action update failed (HTTP ${r.status})`);
+      await load();
+    } catch (e) {
+      alert(e?.message || "Failed to update action");
+    }
+  }
 
-  if (err)
+  if (loading) {
     return (
-      <div style={{ ...styles.state, color: "#9B1C1C" }}>
-        Error: {err}
-        <div style={{ marginTop: 10 }}>
-          <a href="/" style={styles.link}>
+      <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
+        <div style={{ color: "#667085" }}>Loading claim…</div>
+      </div>
+    );
+  }
+
+  if (err || !claim) {
+    return (
+      <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
+        <div style={{ marginBottom: 12 }}>
+          <Link href="/" style={{ textDecoration: "none", fontWeight: 800, color: "#1570EF" }}>
             ← Back to claims
-          </a>
+          </Link>
+        </div>
+        <div
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            background: "#FEF3F2",
+            border: "1px solid #FDA29B",
+            color: "#B42318",
+            fontWeight: 800,
+          }}
+        >
+          Error: {err || "Claim not found"}
         </div>
       </div>
     );
+  }
 
-  const ex = claim?.extraction || {};
-  const covers = (claim?.classification?.covers || []).map((c) => c.type).filter(Boolean);
+  const ex = claim.extraction || {};
+  const coverList = (claim.covers || []).join(", ") || "—";
 
   return (
-    <div style={styles.page}>
-      <div style={styles.topRow}>
-        <a href="/" style={styles.link}>
-          ← Back to claims
-        </a>
-        <button onClick={loadClaim} style={styles.btn}>
-          Refresh
-        </button>
+    <div style={{ padding: 24, maxWidth: 1120, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <div style={{ color: "#667085", fontWeight: 900, fontSize: 13 }}>Claim</div>
+          <h1 style={{ margin: 0, fontSize: 26 }}>{claim.claimNumber}</h1>
+          <div style={{ marginTop: 6, color: "#667085" }}>
+            {safe(ex.vesselName || claim.vesselName)} • {safe(ex.eventDateText)} • {safe(ex.locationText)} • Covers:{" "}
+            {coverList}
+          </div>
+        </div>
+
+        <Link
+          href="/"
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #D0D5DD",
+            background: "#FFFFFF",
+            fontWeight: 800,
+            textDecoration: "none",
+            color: "#101828",
+          }}
+        >
+          ← Back
+        </Link>
       </div>
 
-      <div style={styles.headerCard}>
-        <div>
-          <div style={styles.claimNo}>{claim.claimNumber}</div>
-          <div style={styles.meta}>
-            <div>
-              <span style={styles.k}>Vessel:</span> {ex.vesselName || "-"}
+      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={panel}>
+          <div style={panelHeader}>
+            <div style={{ fontWeight: 950 }}>Progress</div>
+            <div style={{ color: "#667085", fontSize: 13 }}>Status log drives reminders & reporting</div>
+          </div>
+          <div style={{ padding: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
+              <div style={label}>Progress status</div>
+              <input
+                value={progressStatus}
+                onChange={(e) => setProgressStatus(e.target.value)}
+                placeholder="e.g., Insurers Notified / Survey Appointed / Under Review / Settled"
+                style={input}
+              />
             </div>
-            <div>
-              <span style={styles.k}>Date:</span> {ex.eventDateText || "-"}
-            </div>
-            <div>
-              <span style={styles.k}>Location:</span> {ex.locationText || "-"}
-            </div>
-          </div>
-
-          <div style={styles.pills}>
-            {covers.length ? (
-              covers.map((c) => (
-                <span key={c} style={styles.pill}>
-                  {c}
-                </span>
-              ))
-            ) : (
-              <span style={styles.pillMuted}>No cover classified</span>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div style={styles.smallLabel}>Progress status</div>
-          <div style={styles.inlineRow}>
-            <input
-              value={progressStatus}
-              onChange={(e) => setProgressStatus(e.target.value)}
-              style={styles.input}
-              placeholder="e.g. Insurers Notified / Survey Appointed / Settled"
-            />
-            <button onClick={saveProgress} style={styles.btnPrimary}>
-              Save
-            </button>
-          </div>
-
-          <div style={{ marginTop: 12 }}>
-            <div style={styles.smallLabel}>Outstanding (server)</div>
-            <div style={styles.money}>
-              {(claim.finance?.outstanding ?? 0).toLocaleString()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.grid}>
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Actions</div>
-          <div style={styles.cardSub}>Mark tasks done and keep the case moving.</div>
-
-          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-            {(claim.actions || []).map((a) => (
-              <div key={a.id} style={styles.actionRow}>
-                <div style={{ flex: 1 }}>
-                  <div style={styles.actionTitle}>{a.title}</div>
-                  <div style={styles.actionMeta}>
-                    Role: {a.ownerRole} • Due: {fmtDate(a.dueAt)} • Status:{" "}
-                    <b>{a.status}</b>
-                  </div>
-                </div>
-
-                {a.status !== "DONE" ? (
-                  <button onClick={() => markActionDone(a.id)} style={styles.btnSmall}>
-                    Mark DONE
-                  </button>
-                ) : (
-                  <span style={styles.doneBadge}>DONE</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 14 }}>
-          <div style={styles.card}>
-            <div style={styles.cardTitle}>Finance</div>
-            <div style={styles.cardSub}>Update reserve, deductible, recovery.</div>
-
-            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-              <Field label="Currency">
-                <input
-                  value={finance.currency}
-                  onChange={(e) => setFinance({ ...finance, currency: e.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-
-              <Field label="Reserve Estimated">
-                <input
-                  type="number"
-                  value={finance.reserveEstimated}
-                  onChange={(e) => setFinance({ ...finance, reserveEstimated: e.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-
-              <Field label="Deductible">
-                <input
-                  type="number"
-                  value={finance.deductible}
-                  onChange={(e) => setFinance({ ...finance, deductible: e.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-
-              <Field label="Recovered">
-                <input
-                  type="number"
-                  value={finance.recovered}
-                  onChange={(e) => setFinance({ ...finance, recovered: e.target.value })}
-                  style={styles.input}
-                />
-              </Field>
-
-              <Field label="Notes">
-                <textarea
-                  value={finance.notes}
-                  onChange={(e) => setFinance({ ...finance, notes: e.target.value })}
-                  style={{ ...styles.input, height: 90, resize: "vertical" }}
-                />
-              </Field>
-
-              <button onClick={saveFinance} style={styles.btnPrimary}>
-                Save Finance
-              </button>
-            </div>
-          </div>
-
-          <div style={styles.card}>
-            <div style={styles.cardTitle}>AI Drafts</div>
-            <div style={styles.cardSub}>Generate drafts and copy in one click.</div>
 
             <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
-              <button onClick={generateDrafts} style={styles.btnPrimary}>
-                Generate Drafts
+              <button
+                onClick={updateProgress}
+                disabled={statusBusy}
+                style={{
+                  ...btnPrimary,
+                  background: statusBusy ? "#B2DDFF" : "#1570EF",
+                  cursor: statusBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {statusBusy ? "Saving..." : "Save Progress"}
               </button>
-              {draftsLoading ? (
-                <div style={{ ...styles.smallLabel, alignSelf: "center" }}>
-                  Generating…
-                </div>
-              ) : null}
             </div>
 
-            {drafts.length ? (
-              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-                {drafts.map((d, idx) => (
-                  <div key={idx} style={styles.draftBox}>
-                    <div style={styles.draftTop}>
-                      <div>
-                        <div style={styles.draftType}>{d.type}</div>
-                        <div style={styles.draftSubject}>{d.subject}</div>
-                      </div>
-                      <button
-                        onClick={() => copyText(`Subject: ${d.subject}\n\n${d.body}`)}
-                        style={styles.btnSmall}
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <pre style={styles.pre}>{d.body}</pre>
-                  </div>
-                ))}
+            <div style={{ marginTop: 12, color: "#667085", fontSize: 13 }}>
+              Latest status: <b style={{ color: "#101828" }}>{safe(claim.progressStatus)}</b>
+            </div>
+          </div>
+        </div>
+
+        <div style={panel}>
+          <div style={panelHeader}>
+            <div style={{ fontWeight: 950 }}>Finance</div>
+            <div style={{ color: "#667085", fontSize: 13 }}>Reserve, recovered and outstanding exposure</div>
+          </div>
+          <div style={{ padding: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10 }}>
+              <div style={label}>Currency</div>
+              <input value={finance.currency} onChange={(e) => setFinance({ ...finance, currency: e.target.value })} style={input} />
+
+              <div style={label}>Reserve (estimate)</div>
+              <input
+                type="number"
+                value={finance.reserveEstimated}
+                onChange={(e) => setFinance({ ...finance, reserveEstimated: Number(e.target.value || 0) })}
+                style={input}
+              />
+
+              <div style={label}>Deductible</div>
+              <input
+                type="number"
+                value={finance.deductible}
+                onChange={(e) => setFinance({ ...finance, deductible: Number(e.target.value || 0) })}
+                style={input}
+              />
+
+              <div style={label}>Recovered</div>
+              <input
+                type="number"
+                value={finance.recovered}
+                onChange={(e) => setFinance({ ...finance, recovered: Number(e.target.value || 0) })}
+                style={input}
+              />
+
+              <div style={label}>Notes</div>
+              <textarea
+                rows={3}
+                value={finance.notes}
+                onChange={(e) => setFinance({ ...finance, notes: e.target.value })}
+                style={{ ...input, height: "auto" }}
+              />
+            </div>
+
+            <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                onClick={updateFinance}
+                disabled={financeBusy}
+                style={{
+                  ...btnPrimary,
+                  background: financeBusy ? "#B2DDFF" : "#1570EF",
+                  cursor: financeBusy ? "not-allowed" : "pointer",
+                }}
+              >
+                {financeBusy ? "Saving..." : "Save Finance"}
+              </button>
+
+              <div style={{ marginLeft: "auto", color: "#667085", fontSize: 13 }}>
+                Outstanding: <b style={{ color: "#101828" }}>{money(claim.finance?.outstanding || 0)}</b>
               </div>
-            ) : (
-              <div style={{ ...styles.state, marginTop: 12 }}>No drafts yet.</div>
-            )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={styles.card}>
-        <div style={styles.cardTitle}>Audit Trail</div>
-        <div style={styles.cardSub}>Chronological actions.</div>
+      <div style={{ marginTop: 12, ...panel }}>
+        <div style={panelHeader}>
+          <div style={{ fontWeight: 950 }}>First Notification (Raw)</div>
+          <div style={{ color: "#667085", fontSize: 13 }}>This is the “single source of truth”</div>
+        </div>
+        <pre style={{ margin: 0, padding: 14, whiteSpace: "pre-wrap", background: "#FCFCFD", borderTop: "1px solid #EAECF0" }}>
+{safe(ex.rawText || "", "(empty)")}
+        </pre>
+      </div>
 
-        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-          {(claim.auditTrail || []).slice().reverse().map((a, idx) => (
-            <div key={idx} style={styles.auditRow}>
-              <div style={styles.auditAt}>{fmtDate(a.at)}</div>
-              <div style={styles.auditMain}>
-                <b>{a.action}</b> — {a.note}
-                <div style={styles.auditBy}>by {a.by}</div>
+      <div style={{ marginTop: 12, ...panel }}>
+        <div style={panelHeader}>
+          <div style={{ fontWeight: 950 }}>Actions</div>
+          <div style={{ color: "#667085", fontSize: 13 }}>Track tasks + reminders per claim</div>
+        </div>
+
+        <div>
+          {(claim.actions || []).map((a) => (
+            <div key={a.id} style={{ borderTop: "1px solid #EAECF0", padding: 14, display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 900 }}>{a.title}</div>
+                <div style={{ color: "#667085", fontSize: 13 }}>
+                  Owner: {a.ownerRole} • Due: {a.dueAt ? new Date(a.dueAt).toLocaleString() : "—"} • Reminder:{" "}
+                  {a.reminderAt ? new Date(a.reminderAt).toLocaleString() : "—"}
+                </div>
+                <div style={{ color: "#667085", fontSize: 13, marginTop: 6 }}>{a.notes ? `Notes: ${a.notes}` : ""}</div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span
+                  style={{
+                    fontWeight: 900,
+                    color: a.status === "DONE" ? "#067647" : "#B54708",
+                    background: a.status === "DONE" ? "#ECFDF3" : "#FFFAEB",
+                    border: "1px solid #EAECF0",
+                    borderRadius: 999,
+                    padding: "6px 10px",
+                    fontSize: 12,
+                  }}
+                >
+                  {a.status}
+                </span>
+
+                <button onClick={() => updateAction(a.id, { status: a.status === "DONE" ? "OPEN" : "DONE" })} style={{ ...btn, fontWeight: 900 }}>
+                  {a.status === "DONE" ? "Reopen" : "Mark Done"}
+                </button>
               </div>
             </div>
           ))}
+
+          {(claim.actions || []).length === 0 ? <div style={{ padding: 14, color: "#667085" }}>No actions.</div> : null}
         </div>
       </div>
 
-      <div style={styles.card}>
-        <div style={styles.cardTitle}>First Notification (Raw)</div>
-        <pre style={styles.pre}>{ex.rawText || "-"}</pre>
+      <div style={{ marginTop: 12, ...panel }}>
+        <div style={panelHeader}>
+          <div style={{ fontWeight: 950 }}>Draft Templates</div>
+          <div style={{ color: "#667085", fontSize: 13 }}>
+            Templates generated from extracted claim facts (no AI cost). Choose a draft type → copy subject/body.
+          </div>
+        </div>
+
+        <div style={{ padding: 14 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {drafts.map((d) => (
+              <DraftCard key={d.type} draft={d} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 16, color: "#98A2B3", fontSize: 12 }}>
+        Note: Patch routes for Progress/Finance/Actions are next (Step 9C) to work on Vercel. Claim load + drafts now work via /api/claims/[id].
       </div>
     </div>
   );
 }
 
-function Field({ label, children }) {
+function DraftCard({ draft }) {
+  const fullText = `Subject: ${draft.subject}\n\n${draft.body}`;
+
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <div style={styles.smallLabel}>{label}</div>
-      {children}
+    <div
+      style={{
+        width: "calc(50% - 5px)",
+        minWidth: 420,
+        border: "1px solid #EAECF0",
+        borderRadius: 12,
+        background: "#FFFFFF",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ padding: 12, borderBottom: "1px solid #EAECF0", display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ fontWeight: 950, flex: 1 }}>{draft.title}</div>
+        <button onClick={() => copyToClipboard(fullText)} style={{ ...btn, fontWeight: 900 }}>
+          Copy
+        </button>
+      </div>
+
+      <div style={{ padding: 12, background: "#FCFCFD" }}>
+        <div style={{ color: "#344054", fontWeight: 900, fontSize: 12 }}>Subject</div>
+        <div style={{ marginTop: 6, fontWeight: 800, color: "#101828" }}>{draft.subject}</div>
+
+        <div style={{ marginTop: 12, color: "#344054", fontWeight: 900, fontSize: 12 }}>Body</div>
+        <pre style={{ marginTop: 6, marginBottom: 0, whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.35 }}>
+{draft.body}
+        </pre>
+      </div>
     </div>
   );
 }
 
-function fmtDate(iso) {
-  if (!iso) return "-";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
+const panel = {
+  border: "1px solid #EAECF0",
+  borderRadius: 12,
+  background: "#FFFFFF",
+  overflow: "hidden",
+};
 
-const styles = {
-  page: { display: "grid", gap: 14 },
-  topRow: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  link: { color: "#1F3B77", textDecoration: "none", fontWeight: 800 },
+const panelHeader = {
+  padding: 14,
+  borderBottom: "1px solid #EAECF0",
+};
 
-  headerCard: {
-    background: "#FFFFFF",
-    border: "1px solid #E6EAF2",
-    borderRadius: 18,
-    padding: 16,
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 14,
-    boxShadow: "0 1px 0 rgba(10,20,40,0.03)",
-  },
-  claimNo: { fontSize: 18, fontWeight: 950 },
-  meta: { marginTop: 8, display: "grid", gap: 4, fontSize: 13, color: "#23314A" },
-  k: { color: "#51607A", fontWeight: 800 },
+const label = { color: "#344054", fontWeight: 900, fontSize: 13 };
 
-  pills: { marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" },
-  pill: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#F1F6FF",
-    border: "1px solid #D9E6FF",
-    color: "#1F3B77",
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  pillMuted: {
-    padding: "6px 10px",
-    borderRadius: 999,
-    background: "#FBFCFE",
-    border: "1px solid #EEF1F6",
-    color: "#7A879D",
-    fontSize: 12,
-    fontWeight: 800,
-  },
+const input = {
+  padding: "10px 12px",
+  border: "1px solid #D0D5DD",
+  borderRadius: 10,
+  outline: "none",
+  background: "#FCFCFD",
+};
 
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
+const btn = {
+  padding: "8px 10px",
+  borderRadius: 10,
+  border: "1px solid #D0D5DD",
+  background: "#FFFFFF",
+  cursor: "pointer",
+};
 
-  card: {
-    background: "#FFFFFF",
-    border: "1px solid #E6EAF2",
-    borderRadius: 18,
-    padding: 16,
-    boxShadow: "0 1px 0 rgba(10,20,40,0.03)",
-  },
-  cardTitle: { fontSize: 14, fontWeight: 950 },
-  cardSub: { marginTop: 4, fontSize: 12, color: "#51607A" },
-
-  btn: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid #EEF1F6",
-    background: "#FFFFFF",
-    fontWeight: 850,
-    cursor: "pointer",
-  },
-  btnPrimary: {
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid #D9E6FF",
-    background: "#EEF4FF",
-    fontWeight: 950,
-    cursor: "pointer",
-    color: "#1F3B77",
-  },
-  btnSmall: {
-    padding: "8px 10px",
-    borderRadius: 12,
-    border: "1px solid #D9E6FF",
-    background: "#EEF4FF",
-    fontWeight: 950,
-    cursor: "pointer",
-    color: "#1F3B77",
-    whiteSpace: "nowrap",
-  },
-
-  inlineRow: { display: "flex", gap: 10, alignItems: "center" },
-  input: {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 12,
-    border: "1px solid #E6EAF2",
-    outline: "none",
-    background: "#FBFCFE",
-    fontSize: 13,
-  },
-  smallLabel: { fontSize: 12, color: "#51607A", fontWeight: 900 },
-
-  state: {
-    padding: 14,
-    background: "#FBFCFE",
-    border: "1px solid #EEF1F6",
-    borderRadius: 14,
-    color: "#51607A",
-    fontSize: 13,
-  },
-
-  actionRow: {
-    border: "1px solid #EEF1F6",
-    borderRadius: 14,
-    padding: 12,
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    background: "#FBFCFE",
-  },
-  actionTitle: { fontSize: 13, fontWeight: 950 },
-  actionMeta: { marginTop: 4, fontSize: 12, color: "#51607A" },
-  doneBadge: {
-    padding: "8px 10px",
-    borderRadius: 999,
-    background: "#ECFDF3",
-    border: "1px solid #A7F3D0",
-    color: "#065F46",
-    fontSize: 12,
-    fontWeight: 950,
-  },
-
-  money: {
-    marginTop: 6,
-    fontSize: 20,
-    fontWeight: 950,
-    fontFamily:
-      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-  },
-
-  draftBox: {
-    border: "1px solid #EEF1F6",
-    borderRadius: 14,
-    padding: 12,
-    background: "#FBFCFE",
-  },
-  draftTop: { display: "flex", justifyContent: "space-between", gap: 10 },
-  draftType: { fontSize: 12, fontWeight: 950, color: "#1F3B77" },
-  draftSubject: { marginTop: 4, fontSize: 12, color: "#23314A", fontWeight: 900 },
-
-  pre: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 14,
-    border: "1px solid #EEF1F6",
-    background: "#FFFFFF",
-    fontSize: 12,
-    whiteSpace: "pre-wrap",
-    wordBreak: "break-word",
-  },
-
-  auditRow: {
-    display: "grid",
-    gridTemplateColumns: "220px 1fr",
-    gap: 10,
-    padding: 10,
-    border: "1px solid #EEF1F6",
-    borderRadius: 14,
-    background: "#FBFCFE",
-  },
-  auditAt: {
-    fontSize: 12,
-    color: "#51607A",
-    fontFamily:
-      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-  },
-  auditMain: { fontSize: 13, color: "#23314A" },
-  auditBy: { marginTop: 4, fontSize: 12, color: "#7A879D" },
+const btnPrimary = {
+  padding: "10px 14px",
+  borderRadius: 10,
+  border: "1px solid #175CD3",
+  background: "#1570EF",
+  color: "#FFFFFF",
+  cursor: "pointer",
+  fontWeight: 900,
 };
