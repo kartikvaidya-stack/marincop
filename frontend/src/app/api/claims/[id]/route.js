@@ -5,10 +5,23 @@ function backendBaseUrl() {
   return raw.endsWith("/") ? raw.slice(0, -1) : raw;
 }
 
-export async function GET(_req, { params }) {
+// Robust: get the last path segment as the id
+function extractIdFromUrl(req) {
   try {
-    const id = params?.id;
-    if (!id) {
+    const url = new URL(req.url);
+    const parts = url.pathname.split("/").filter(Boolean);
+    // ... /api/claims/<id>
+    return parts[parts.length - 1] || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(req) {
+  try {
+    const id = extractIdFromUrl(req);
+
+    if (!id || id === "claims") {
       return NextResponse.json({ ok: false, error: "BadRequest", message: "Missing claim id" }, { status: 400 });
     }
 
