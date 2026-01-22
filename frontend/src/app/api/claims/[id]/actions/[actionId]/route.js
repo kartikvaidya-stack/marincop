@@ -1,44 +1,30 @@
-import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 
-function backendBaseUrl() {
-  const raw = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+async function getParamsAsync(ctx) {
+  const p = ctx?.params;
+  if (!p) return {};
+  if (typeof p.then === "function") return (await p) || {};
+  return p;
 }
 
-export async function PATCH(req, { params }) {
-  try {
-    const id = params?.id;
-    const actionId = params?.actionId;
+export async function PATCH(req, ctx) {
+  const params = await getParamsAsync(ctx);
+  const id = params?.id;
+  const actionId = params?.actionId;
 
-    if (!id || !actionId) {
-      return NextResponse.json(
-        { ok: false, error: "BadRequest", message: "Missing claim id or action id" },
-        { status: 400 }
-      );
-    }
+  if (!id) return Response.json({ ok: false, error: "BadRequest", message: "Missing claim id." }, { status: 400 });
+  if (!actionId) return Response.json({ ok: false, error: "BadRequest", message: "Missing action id." }, { status: 400 });
 
-    const payload = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
-    const r = await fetch(`${backendBaseUrl()}/api/claims/${id}/actions/${actionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  const r = await fetch(`${base}/api/claims/${id}/actions/${actionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
 
-    const data = await r.json().catch(() => null);
-
-    if (!r.ok || !data) {
-      return NextResponse.json(
-        { ok: false, error: "UpstreamError", message: data?.message || `Upstream failed (HTTP ${r.status})` },
-        { status: r.status || 502 }
-      );
-    }
-
-    return NextResponse.json(data, { status: 200 });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: "ServerError", message: e?.message || "Unexpected server error" },
-      { status: 500 }
-    );
-  }
+  const j = await r.json().catch(() => ({}));
+  return Response.json(j, { status: r.status });
 }

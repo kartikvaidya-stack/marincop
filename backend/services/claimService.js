@@ -1,167 +1,169 @@
 // backend/services/claimService.js
+// Core claim operations + persistence (JSON file) + reminders + drafts.
+// Includes AI-assisted extraction if available.
+// Also exports compatibility function names used by older controllers/routes.
 
-const { v4: uuidv4 } = require("uuid");
-const { loadDb, saveDb } = require("../utils/db");
-const { extractFirstNotification } = require("../utils/extraction"); // async now
-const { classifyCovers } = require("../utils/classification");
+const fs = require("fs");
+const path = require("path");
+const { randomUUID } = require("crypto");
 
-/**
- * Helpers
- */
-function nowIso() {
+const extractionUtil = require("../utils/extraction");
+const classificationUtil = require("../utils/classification");
+
+// ---------- Storage (JSON file) ----------
+const DATA_FILE = path.join(process.cwd(), "database", "data", "claims.json");
+
+function ensureDataFile() {
+  const dir = path.dirname(DATA_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2), "utf8");
+}
+
+function readAllClaims() {
+  ensureDataFile();
+  const raw = fs.readFileSync(DATA_FILE, "utf8");
+  const arr = JSON.parse(raw || "[]");
+  return Array.isArray(arr) ? arr : [];
+}
+
+function writeAllClaims(claims) {
+  ensureDataFile();
+  fs.writeFileSync(DATA_FILE, JSON.stringify(claims, null, 2), "utf8");
+}
+
+// ---------- Helpers ----------
+function nowISO() {
   return new Date().toISOString();
 }
 
-function safeNumber(n) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : 0;
+function safeArray(x) {
+  return Array.isArray(x) ? x : [];
 }
 
-function addDays(isoOrDate, days) {
-  const d = isoOrDate ? new Date(isoOrDate) : new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString();
+function safeObj(x) {
+  return x && typeof x === "object" ? x : {};
+}
+
+function toNumber(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function computeOutstanding(fin) {
-  const reserve = safeNumber(fin.reserveEstimated);
-  const recovered = safeNumber(fin.recovered);
-  return Math.max(0, reserve - recovered);
+  const reserve = toNumber(fin.reserveEstimated);
+  const recovered = toNumber(fin.recovered);
+  const outstanding = Math.max(0, reserve - recovered);
+  return { reserve, recovered, outstanding };
 }
 
-function nextClaimNumber(db, company, dt = new Date()) {
-  const year = dt.getFullYear();
-  const prefix = "MC";
-  const companyCode = "NOVA";
-  const existing = (db.claims || []).filter((c) =>
-    (c.claimNumber || "").includes(`${prefix}-${companyCode}-${year}-`)
-  );
-
-  const nums = existing
-    .map((c) => String(c.claimNumber || "").split("-").pop())
-    .map((x) => parseInt(x, 10))
-    .filter((n) => Number.isFinite(n));
-
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  const seq = String(next).padStart(4, "0");
-  return `${prefix}-${companyCode}-${year}-${seq}`;
+function nextClaimNumber(existingClaims, companyCode = "NOVA") {
+  const year = new Date().getUTCFullYear();
+  const prefix = `MC-${companyCode}-${year}-`;
+  const nums = existingClaims
+    .map((c) => c.claimNumber || "")
+    .filter((x) => x.startsWith(prefix))
+    .map((x) => {
+      const last = x.split("-").pop();
+      const n = Number(last);
+      return Number.isFinite(n) ? n : 0;
+    });
+  const max = nums.length ? Math.max(...nums) : 0;
+  const next = String(max + 1).padStart(4, "0");
+  return `${prefix}${next}`;
 }
 
-function buildDefaultActions(claimId, createdAtIso) {
-  const baseIso = new Date(createdAtIso).toISOString();
+function defaultActions(claimId, createdAtISO) {
+  const base = new Date(createdAtISO).getTime();
+  const plusDays = (d) => new Date(base + d * 24 * 3600 * 1000).toISOString();
 
   return [
-    {
-      id: `${claimId}-A1`,
-      title: "Create claim file and preserve evidence",
-      ownerRole: "Claims",
-      dueAt: baseIso,
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A2`,
-      title: "Confirm cover(s) and notify relevant insurers/club",
-      ownerRole: "Claims",
-      dueAt: baseIso,
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A3`,
-      title: "Collect supporting documents (log extracts, photos, reports)",
-      ownerRole: "Ops",
-      dueAt: addDays(baseIso, 1),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A4`,
-      title: "Appoint / confirm surveyor (if required)",
-      ownerRole: "Claims",
-      dueAt: addDays(baseIso, 1),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A5`,
-      title: "Establish initial reserve (estimate) and deductible impact",
-      ownerRole: "Finance",
-      dueAt: addDays(baseIso, 2),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A6`,
-      title: "Track updates and maintain status log",
-      ownerRole: "Claims",
-      dueAt: baseIso,
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A7`,
-      title: "Identify third-party involvement and liability exposure",
-      ownerRole: "Claims",
-      dueAt: addDays(baseIso, 1),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A8`,
-      title: "Obtain statements (Master/crew) and incident report",
-      ownerRole: "Ops",
-      dueAt: addDays(baseIso, 1),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
-    {
-      id: `${claimId}-A9`,
-      title: "Notify relevant correspondents / local agents if needed",
-      ownerRole: "Claims",
-      dueAt: addDays(baseIso, 1),
-      status: "OPEN",
-      createdAt: baseIso,
-      updatedAt: baseIso,
-      reminderAt: null,
-      notes: "",
-    },
+    { id: `${claimId}-A1`, title: "Create claim file and preserve evidence", ownerRole: "Claims", dueAt: createdAtISO, status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A2`, title: "Confirm cover(s) and notify relevant insurers/club", ownerRole: "Claims", dueAt: createdAtISO, status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A3`, title: "Collect supporting documents (log extracts, photos, reports)", ownerRole: "Ops", dueAt: plusDays(1), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A4`, title: "Appoint / confirm surveyor (if required)", ownerRole: "Claims", dueAt: plusDays(1), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A5`, title: "Establish initial reserve (estimate) and deductible impact", ownerRole: "Finance", dueAt: plusDays(2), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A6`, title: "Track updates and maintain status log", ownerRole: "Claims", dueAt: createdAtISO, status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A7`, title: "Identify third-party involvement and liability exposure", ownerRole: "Claims", dueAt: plusDays(1), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A8`, title: "Obtain statements (Master/crew) and incident report", ownerRole: "Ops", dueAt: plusDays(1), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
+    { id: `${claimId}-A9`, title: "Notify relevant correspondents / local agents if needed", ownerRole: "Claims", dueAt: plusDays(1), status: "OPEN", createdAt: createdAtISO, updatedAt: createdAtISO, reminderAt: null, notes: "" },
   ];
 }
 
-/**
- * Service methods
- */
-async function listClaims() {
-  const db = loadDb();
-  return (db.claims || []).map((c) => ({
+function ensureClaimShape(claim) {
+  claim.actions = safeArray(claim.actions);
+  claim.files = safeArray(claim.files);
+  claim.statusLog = safeArray(claim.statusLog);
+  claim.auditTrail = safeArray(claim.auditTrail);
+  claim.finance = safeObj(claim.finance);
+  claim.extraction = safeObj(claim.extraction);
+  claim.classification = safeObj(claim.classification);
+
+  const { reserve, recovered, outstanding } = computeOutstanding(claim.finance);
+  claim.finance.reserveEstimated = reserve;
+  claim.finance.recovered = recovered;
+  claim.finance.outstanding = outstanding;
+
+  return claim;
+}
+
+function addAudit(claim, by, action, note) {
+  claim.auditTrail = safeArray(claim.auditTrail);
+  claim.auditTrail.push({ at: nowISO(), by: by || "System", action, note: note || "" });
+}
+
+function addStatusLog(claim, by, status, note) {
+  claim.statusLog = safeArray(claim.statusLog);
+  claim.statusLog.push({ at: nowISO(), by: by || "System", status, note: note || "" });
+}
+
+// ---------- Main API ----------
+async function createClaim({ company = "Nova Carriers", createdBy = "System", firstNotificationText = "" }) {
+  const claims = readAllClaims();
+  const id = randomUUID();
+  const createdAt = nowISO();
+  const companyCode = "NOVA";
+
+  // extraction (AI-assisted if available)
+  let extraction = null;
+  if (typeof extractionUtil.extractFromFirstNotificationWithAI === "function") {
+    extraction = await extractionUtil.extractFromFirstNotificationWithAI(firstNotificationText);
+  } else {
+    extraction = extractionUtil.extractFromFirstNotification(firstNotificationText);
+  }
+
+  const classification = classificationUtil.classifyFromExtraction(extraction);
+
+  const claim = ensureClaimShape({
+    id,
+    claimNumber: nextClaimNumber(claims, companyCode),
+    company,
+    createdAt,
+    updatedAt: createdAt,
+    createdBy,
+    progressStatus: "Notification Received",
+    extraction,
+    classification,
+    actions: defaultActions(id, createdAt),
+    finance: { currency: "USD", reserveEstimated: 0, deductible: 0, recovered: 0, outstanding: 0, notes: "" },
+    files: [],
+    statusLog: [{ at: createdAt, by: createdBy, status: "Notification Received", note: "Claim created from first notification." }],
+    auditTrail: [],
+  });
+
+  addAudit(claim, createdBy, "CLAIM_CREATED", "Created claim from first notification");
+
+  claims.unshift(claim);
+  writeAllClaims(claims);
+
+  return claim;
+}
+
+function listClaims() {
+  const claims = readAllClaims().map(ensureClaimShape);
+  return claims.map((c) => ({
     id: c.id,
     claimNumber: c.claimNumber,
-    vesselName: c.extraction?.vesselName || c.vesselName || null,
+    vesselName: c.extraction?.vesselName || null,
     eventDateText: c.extraction?.eventDateText || null,
     locationText: c.extraction?.locationText || null,
     progressStatus: c.progressStatus,
@@ -174,262 +176,200 @@ async function listClaims() {
   }));
 }
 
-async function createClaim({ createdBy, firstNotificationText }) {
-  if (!createdBy) throw new Error("createdBy is required");
-  if (!firstNotificationText) throw new Error("firstNotificationText is required");
-
-  const db = loadDb();
-  db.claims = db.claims || [];
-
-  const createdAt = nowIso();
-  const id = uuidv4();
-
-  // ✅ AI-first extraction (async). Falls back inside extraction.js if AI fails.
-  const extraction = await extractFirstNotification(firstNotificationText);
-  const classification = classifyCovers(extraction);
-
-  const company = "Nova Carriers";
-  const claimNumber = nextClaimNumber(db, company, new Date(createdAt));
-
-  const claim = {
-    id,
-    claimNumber,
-    company,
-    createdAt,
-    createdBy,
-    updatedAt: createdAt,
-
-    progressStatus: "Notification Received",
-
-    extraction,
-    classification,
-
-    actions: buildDefaultActions(id, createdAt),
-
-    finance: {
-      currency: "USD",
-      reserveEstimated: 0,
-      deductible: 0,
-      recovered: 0,
-      outstanding: 0,
-      notes: "",
-    },
-
-    files: [],
-
-    statusLog: [
-      {
-        at: createdAt,
-        by: createdBy,
-        status: "Notification Received",
-        note: "Claim created from first notification.",
-      },
-    ],
-
-    auditTrail: [
-      {
-        at: createdAt,
-        by: createdBy,
-        action: "STATUS_LOG_IMPORTED",
-        note: "Notification Received - Claim created from first notification.",
-      },
-    ],
-  };
-
-  claim.finance.outstanding = computeOutstanding(claim.finance);
-
-  db.claims.unshift(claim);
-  saveDb(db);
-
-  return claim;
+function getClaimById(id) {
+  const claims = readAllClaims().map(ensureClaimShape);
+  return claims.find((c) => c.id === id) || null;
 }
 
-async function getClaim(id) {
-  const db = loadDb();
-  return (db.claims || []).find((c) => c.id === id) || null;
+function saveClaim(updatedClaim) {
+  const claims = readAllClaims().map(ensureClaimShape);
+  const idx = claims.findIndex((c) => c.id === updatedClaim.id);
+  if (idx === -1) return null;
+  updatedClaim.updatedAt = nowISO();
+  claims[idx] = ensureClaimShape(updatedClaim);
+  writeAllClaims(claims);
+  return claims[idx];
 }
 
-async function updateProgress({ claimId, by, progressStatus }) {
-  if (!by) throw new Error("by is required");
-  if (!progressStatus) throw new Error("progressStatus is required");
-
-  const db = loadDb();
-  const claim = (db.claims || []).find((c) => c.id === claimId);
-  if (!claim) throw new Error("Claim not found");
-
-  const t = nowIso();
-  claim.progressStatus = progressStatus;
-  claim.updatedAt = t;
-
-  claim.statusLog = claim.statusLog || [];
-  claim.statusLog.push({ at: t, by, status: progressStatus, note: "Progress updated" });
-
-  claim.auditTrail = claim.auditTrail || [];
-  claim.auditTrail.push({
-    at: t,
-    by,
-    action: "STATUS_UPDATED",
-    note: `Progress set to: ${progressStatus}`,
-  });
-
-  saveDb(db);
-  return { progressStatus };
+function updateProgress(claimId, { by = "System", progressStatus = "" }) {
+  const claim = getClaimById(claimId);
+  if (!claim) return null;
+  claim.progressStatus = progressStatus || claim.progressStatus;
+  addStatusLog(claim, by, claim.progressStatus, "Progress updated");
+  addAudit(claim, by, "STATUS_UPDATED", `Progress set to: ${claim.progressStatus}`);
+  return saveClaim(claim);
 }
 
-async function updateFinance({ claimId, by, finance }) {
-  if (!by) throw new Error("by is required");
-  if (!finance) throw new Error("finance is required");
+function updateFinance(claimId, { by = "System", finance = {} }) {
+  const claim = getClaimById(claimId);
+  if (!claim) return null;
 
-  const db = loadDb();
-  const claim = (db.claims || []).find((c) => c.id === claimId);
-  if (!claim) throw new Error("Claim not found");
+  claim.finance = { ...safeObj(claim.finance), ...safeObj(finance) };
+  const { reserve, recovered, outstanding } = computeOutstanding(claim.finance);
+  claim.finance.reserveEstimated = reserve;
+  claim.finance.recovered = recovered;
+  claim.finance.outstanding = outstanding;
 
-  const t = nowIso();
-  claim.finance = claim.finance || {};
-
-  claim.finance.currency = finance.currency || claim.finance.currency || "USD";
-  claim.finance.reserveEstimated = safeNumber(finance.reserveEstimated);
-  claim.finance.deductible = safeNumber(finance.deductible);
-  claim.finance.recovered = safeNumber(finance.recovered);
-  claim.finance.notes = finance.notes || "";
-
-  claim.finance.outstanding = computeOutstanding(claim.finance);
-
-  claim.updatedAt = t;
-
-  claim.auditTrail = claim.auditTrail || [];
-  claim.auditTrail.push({
-    at: t,
-    by,
-    action: "FINANCE_UPDATED",
-    note: `Finance updated (reserve=${claim.finance.reserveEstimated}, recovered=${claim.finance.recovered}, outstanding=${claim.finance.outstanding})`,
-  });
-
-  saveDb(db);
-  return claim.finance;
+  addAudit(claim, by, "FINANCE_UPDATED", `Finance updated (reserve=${reserve}, recovered=${recovered}, outstanding=${outstanding})`);
+  return saveClaim(claim);
 }
 
-async function updateAction({ claimId, actionId, by, status, notes, reminderAt }) {
-  if (!by) throw new Error("by is required");
+function updateAction(claimId, actionId, { by = "System", status, notes, reminderAt }) {
+  const claim = getClaimById(claimId);
+  if (!claim) return null;
 
-  const db = loadDb();
-  const claim = (db.claims || []).find((c) => c.id === claimId);
-  if (!claim) throw new Error("Claim not found");
+  const idx = claim.actions.findIndex((a) => a.id === actionId);
+  if (idx === -1) return null;
 
-  claim.actions = claim.actions || [];
-  const action = claim.actions.find((a) => a.id === actionId);
-  if (!action) throw new Error("Action not found");
+  const a = { ...claim.actions[idx] };
+  if (status) a.status = status;
+  if (typeof notes === "string") a.notes = notes;
+  if (reminderAt === null) a.reminderAt = null;
+  if (typeof reminderAt === "string") a.reminderAt = reminderAt;
+  a.updatedAt = nowISO();
 
-  const t = nowIso();
+  claim.actions[idx] = a;
 
-  if (status) action.status = status;
-  if (typeof notes === "string") action.notes = notes;
-
-  if (reminderAt === null) {
-    action.reminderAt = null;
-  } else if (typeof reminderAt === "string" && reminderAt.trim()) {
-    const dt = new Date(reminderAt);
-    if (!Number.isNaN(dt.getTime())) action.reminderAt = dt.toISOString();
-  }
-
-  action.updatedAt = t;
-  claim.updatedAt = t;
-
-  claim.auditTrail = claim.auditTrail || [];
-  claim.auditTrail.push({
-    at: t,
-    by,
-    action: "ACTION_UPDATED",
-    note: `Action updated: ${action.title} (status=${action.status})`,
-  });
-
-  saveDb(db);
-  return action;
+  addAudit(claim, by, "ACTION_UPDATED", `Action updated: ${a.title} (status=${a.status})`);
+  return saveClaim(claim);
 }
 
-/**
- * Reminders
- * - getDueReminders({before}) => all OPEN actions where reminderAt <= before
- * - snoozeActionReminder({claimId, actionId, by, snoozeDays})
- */
-async function getDueReminders({ before }) {
-  const cutoff = before instanceof Date ? before : new Date(before || Date.now());
-  if (Number.isNaN(cutoff.getTime())) throw new Error("Invalid 'before' date");
+function getDueReminders() {
+  const claims = readAllClaims().map(ensureClaimShape);
+  const now = Date.now();
 
-  const db = loadDb();
-  const out = [];
-
-  for (const claim of db.claims || []) {
-    for (const a of claim.actions || []) {
+  const due = [];
+  for (const c of claims) {
+    for (const a of safeArray(c.actions)) {
+      if (a.status !== "OPEN") continue;
       if (!a.reminderAt) continue;
-      if ((a.status || "").toUpperCase() === "DONE") continue;
-
-      const r = new Date(a.reminderAt);
-      if (Number.isNaN(r.getTime())) continue;
-
-      if (r.getTime() <= cutoff.getTime()) {
-        out.push({
-          claimId: claim.id,
-          claimNumber: claim.claimNumber,
-          vesselName: claim.extraction?.vesselName || claim.vesselName || null,
-          progressStatus: claim.progressStatus,
-          coverTypes: (claim.classification?.covers || []).map((x) => x.type),
+      const t = Date.parse(a.reminderAt);
+      if (!Number.isFinite(t)) continue;
+      if (t <= now) {
+        due.push({
+          claimId: c.id,
+          claimNumber: c.claimNumber,
+          vesselName: c.extraction?.vesselName || null,
+          progressStatus: c.progressStatus,
+          coverTypes: (c.classification?.covers || []).map((x) => x.type),
           actionId: a.id,
           actionTitle: a.title,
           ownerRole: a.ownerRole,
           reminderAt: a.reminderAt,
-          dueAt: a.dueAt || null,
+          dueAt: a.dueAt,
         });
       }
     }
   }
-
-  out.sort((x, y) => new Date(x.reminderAt).getTime() - new Date(y.reminderAt).getTime());
-  return out;
+  due.sort((x, y) => Date.parse(x.reminderAt) - Date.parse(y.reminderAt));
+  return due;
 }
 
-async function snoozeActionReminder({ claimId, actionId, by, snoozeDays }) {
-  if (!by) throw new Error("by is required");
-  const days = Number(snoozeDays);
-  if (!Number.isFinite(days) || days <= 0) throw new Error("snoozeDays must be a positive number");
+function generateDraftTemplates(claimId) {
+  const claim = getClaimById(claimId);
+  if (!claim) return null;
 
-  const db = loadDb();
-  const claim = (db.claims || []).find((c) => c.id === claimId);
-  if (!claim) throw new Error("Claim not found");
+  const claimNumber = claim.claimNumber;
+  const vessel = claim.extraction?.vesselName || "Vessel TBN";
+  const imo = claim.extraction?.imo ? ` (IMO ${claim.extraction.imo})` : "";
+  const dateText = claim.extraction?.eventDateText || "Date TBN";
+  const loc = claim.extraction?.locationText || "Location/Position TBN";
+  const raw = claim.extraction?.rawText || "";
 
-  claim.actions = claim.actions || [];
-  const action = claim.actions.find((a) => a.id === actionId);
-  if (!action) throw new Error("Action not found");
+  return [
+    {
+      type: "P&I_NOTIFICATION",
+      subject: `[${claimNumber}] - ${vessel} - P&I Notification (Initial)`,
+      body:
+        `Dear P&I Club / Correspondents,\n\n` +
+        `We hereby give initial notification of an incident that may give rise to liabilities and/or costs falling within P&I cover.\n\n` +
+        `Claim Ref: ${claimNumber}\n` +
+        `Vessel: ${vessel}${imo}\n` +
+        `Date/Time (as advised): ${dateText}\n` +
+        `Location/Position: ${loc}\n\n` +
+        `Initial description (as received):\n${raw}\n\n` +
+        `Immediate actions taken / proposed:\n` +
+        `- Evidence preservation initiated (photos, statements, log extracts)\n` +
+        `- Request guidance on next steps and appointment of surveyor (if required)\n` +
+        `- Please advise any specific reporting format / documents required\n\n` +
+        `Kindly acknowledge receipt and advise recommended course of action, including any correspondent/surveyor nomination.\n\n` +
+        `Best regards,\nNova Carriers\n(Claims Team)`,
+    },
+    {
+      type: "SURVEYOR_APPOINTMENT",
+      subject: `[${claimNumber}] - ${vessel} - Survey Appointment Request`,
+      body:
+        `Dear Sir/Madam,\n\n` +
+        `Nova Carriers requests your attendance / appointment as surveyor in relation to the below incident.\n\n` +
+        `Claim Ref: ${claimNumber}\n` +
+        `Vessel: ${vessel}${imo}\n` +
+        `Incident date: ${dateText}\n` +
+        `Location: ${loc}\n\n` +
+        `Please confirm:\n` +
+        `1) Earliest attendance and ETA\n` +
+        `2) Information/documents required prior attendance\n` +
+        `3) Expected deliverables and timeline for preliminary and final report\n\n` +
+        `We will provide photographs, statements, and relevant extracts upon confirmation.\n\n` +
+        `Best regards,\nNova Carriers\n(Claims Team)`,
+    },
+    {
+      type: "CHASE_REMINDER",
+      subject: `[${claimNumber}] - ${vessel} - Follow-up / Chase`,
+      body:
+        `Dear All,\n\n` +
+        `Gentle reminder / follow-up in relation to Claim Ref ${claimNumber} (${vessel}).\n\n` +
+        `Pending items:\n` +
+        claim.actions
+          .filter((a) => a.status === "OPEN")
+          .slice(0, 5)
+          .map((a) => `- ${a.title}`)
+          .join("\n") +
+        `\n\nKindly provide an update and expected timeline for closure.\n\n` +
+        `Best regards,\nNova Carriers\n(Claims Team)`,
+    },
+  ];
+}
 
-  const t = nowIso();
-  const base = action.reminderAt ? new Date(action.reminderAt) : new Date();
-  const next = new Date(base);
-  next.setDate(next.getDate() + days);
-
-  action.reminderAt = next.toISOString();
-  action.updatedAt = t;
-  claim.updatedAt = t;
-
-  claim.auditTrail = claim.auditTrail || [];
-  claim.auditTrail.push({
-    at: t,
-    by,
-    action: "REMINDER_SNOOZED",
-    note: `Reminder snoozed by ${days} day(s) for action: ${action.title}`,
-  });
-
-  saveDb(db);
-
-  return { claimId, actionId, reminderAt: action.reminderAt };
+// ---------- Compatibility exports (older controllers expect these names) ----------
+function getClaims() {
+  return listClaims();
+}
+function getClaim(id) {
+  return getClaimById(id);
+}
+function patchProgress(claimId, payload) {
+  return updateProgress(claimId, payload);
+}
+function patchFinance(claimId, payload) {
+  return updateFinance(claimId, payload);
+}
+function patchAction(claimId, actionId, payload) {
+  return updateAction(claimId, actionId, payload);
+}
+function getDrafts(claimId) {
+  return generateDraftTemplates(claimId);
+}
+function getRemindersDue() {
+  return getDueReminders();
 }
 
 module.exports = {
-  listClaims,
+  // new names
   createClaim,
-  getClaim,
+  listClaims,
+  getClaimById,
   updateProgress,
   updateFinance,
   updateAction,
   getDueReminders,
-  snoozeActionReminder,
+  generateDraftTemplates,
+
+  // compatibility names
+  getClaims,
+  getClaim,
+  patchProgress,
+  patchFinance,
+  patchAction,
+  getDrafts,
+  getRemindersDue,
 };

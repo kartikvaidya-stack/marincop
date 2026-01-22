@@ -1,149 +1,183 @@
 // backend/utils/extraction.js
-// Deterministic extractor (v1.1): conservative rules.
-// If uncertain, returns null for vessel/date/location instead of guessing.
+// Robust "first notification" extraction (non-AI baseline).
+// Goal: reliably pull vessel name, IMO, date text, location, keywords from messy text.
 
-function clean(s) {
-  if (!s) return null;
-  const x = String(s).replace(/\r/g, "").trim();
-  return x.length ? x : null;
+function cleanLine(s) {
+  return String(s || "")
+    .replace(/\r/g, "")
+    .trim();
 }
 
-function pickFirstMatch(text, patterns) {
-  for (const re of patterns) {
-    const m = text.match(re);
-    if (m && m[1]) return clean(m[1]);
-  }
-  return null;
+function normSpaces(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
 }
 
-function normalizeVesselName(name) {
-  if (!name) return null;
-  let x = name.trim();
-
-  // Remove trailing punctuation / excessive whitespace
-  x = x.replace(/[;,.\s]+$/g, "").replace(/\s+/g, " ");
-
-  // If it's suspiciously long, it's probably not a vessel name
-  if (x.length > 60) return null;
-
-  // Avoid common false positives
-  const lower = x.toLowerCase();
-  const badStarts = ["incident", "position", "location", "reported", "fire", "damage", "at ", "on "];
-  if (badStarts.some((b) => lower.startsWith(b))) return null;
-
-  return x;
+function stripQuotes(s) {
+  return String(s || "").replace(/^["'“”]+|["'“”]+$/g, "").trim();
 }
 
-function extractVessel(text) {
-  const t = text;
+function looksLikeVesselName(candidate) {
+  const c = normSpaces(stripQuotes(candidate));
+  if (!c) return false;
 
-  // Strong patterns
-  const strong = pickFirstMatch(t, [
-    /(?:^|\n)\s*Vessel\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Ship\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Vsl\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Vessel\s*Name\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-  ]);
-  const strongNorm = normalizeVesselName(strong);
-  if (strongNorm) return strongNorm;
+  // Too long usually means we captured a sentence, not a name
+  if (c.length > 40) return false;
 
-  // MV/MT/MV. in free text (conservative)
-  // e.g. "MV NOVA STAR", "M/V NOVA STAR", "MT NOVA STAR"
-  const m = t.match(/\b(?:M\/V|MV|MT)\s+([A-Z0-9][A-Z0-9\s\-]{2,40})\b/);
-  if (m && m[1]) {
-    const candidate = normalizeVesselName(`${(t.match(/\b(M\/V|MV|MT)\b/) || [])[0] || "MV"} ${m[1]}`.trim());
-    if (candidate) return candidate;
-  }
+  // Avoid capturing full incident descriptions
+  const badWords = [
+    "incident",
+    "reported",
+    "contact",
+    "collision",
+    "grounding",
+    "fire",
+    "damage",
+    "cargo",
+    "anchorage",
+    "position",
+    "latitude",
+    "longitude",
+    "lat",
+    "lon",
+    "no pollution",
+    "please advise",
+  ];
+  const lc = c.toLowerCase();
+  if (badWords.some((w) => lc.includes(w))) return false;
 
-  // If we didn't find a confident vessel name, return null (do NOT guess)
-  return null;
+  // Must have some letters
+  if (!/[A-Za-z]/.test(c)) return false;
+
+  return true;
 }
 
+// Extract IMO (7 digits)
 function extractIMO(text) {
-  const t = text;
-  const imo = pickFirstMatch(t, [
-    /(?:^|\n)\s*IMO\s*:\s*(\d{7})\s*(?:\n|$)/i,
-    /\bIMO\s*(\d{7})\b/i,
-  ]);
-  return imo;
+  const m = String(text || "").match(/\bIMO[:\s#-]*([0-9]{7})\b/i);
+  return m ? m[1] : null;
 }
 
-function extractDateText(text) {
-  // Accept common formats but keep as text
-  const t = text;
+// Extract vessel name with multiple strategies
+function extractVesselName(text) {
+  const t = String(text || "");
+  const lines = t.split("\n").map(cleanLine).filter(Boolean);
 
-  // Lines like: "22 Jan 2026" or "22 January 2026"
-  const line = pickFirstMatch(t, [
-    /(?:^|\n)\s*(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s*(?:\n|$)/,
-  ]);
-  if (line) return line;
+  // 1) Explicit label patterns on a line (best)
+  // Vessel: MV NOVA STAR
+  // Ship: NOVA STAR
+  // Name: M/T NOVA STAR
+  for (const line of lines) {
+    const m = line.match(/^(vessel|ship|vsl|name)\s*[:=-]\s*(.+)$/i);
+    if (m && m[2]) {
+      let cand = normSpaces(m[2]);
+      cand = cand.replace(/\(.*?\)/g, "").trim(); // drop bracket remarks
+      cand = cand.replace(/\b(imo|flag|call\s*sign)\b.*$/i, "").trim();
+      // If line begins with MV/MV. etc keep it; otherwise also ok.
+      if (looksLikeVesselName(cand)) return cand.toUpperCase().startsWith("MV ") || cand.toUpperCase().startsWith("MT ") || cand.toUpperCase().startsWith("M/V") || cand.toUpperCase().startsWith("M/T")
+        ? cand
+        : cand;
+    }
+  }
 
-  // "Date: 20 Jan 2026"
-  const labeled = pickFirstMatch(t, [
-    /(?:^|\n)\s*Date\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Incident\s*Date\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-  ]);
-  if (labeled && labeled.length <= 40) return labeled;
+  // 2) Common "MV/M/V/MT/M/T <NAME>" anywhere in the text
+  // Keep NAME as 2-5 tokens, stop at punctuation/newline.
+  const mvRegex = /\b(MV|M\/V|MT|M\/T)\s+([A-Z0-9][A-Z0-9 \-]{2,40})(?=[$\n\r,.;:)]|\bIMO\b|\bDATE\b|\bPOSITION\b|\bINCIDENT\b|\bAT\b|\bON\b|$)/i;
+  const mvMatch = t.match(mvRegex);
+  if (mvMatch && mvMatch[0]) {
+    const cand = normSpaces(mvMatch[0]);
+    if (looksLikeVesselName(cand)) return cand;
+  }
+
+  // 3) Try "Vessel <NAME>" (no colon)
+  const v2 = t.match(/\bVessel\s+([A-Z0-9][A-Z0-9 \-]{2,40})\b/i);
+  if (v2 && v2[1]) {
+    const cand = normSpaces(v2[1]);
+    if (looksLikeVesselName(cand)) return cand;
+  }
+
+  // 4) Fallback: first line that looks like a vessel name (short and clean)
+  for (const line of lines.slice(0, 6)) {
+    const cand = normSpaces(line)
+      .replace(/\b(imo|date|position|incident|location)\b.*$/i, "")
+      .trim();
+    if (looksLikeVesselName(cand)) return cand;
+  }
 
   return null;
+}
+
+// Date text: keep as raw snippet rather than parsing hard
+function extractEventDateText(text) {
+  const t = String(text || "");
+  // Examples: 22 Jan 2026, 22 January 2026, 2026-01-22
+  const m =
+    t.match(/\b([0-3]?\d\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\s+\d{4})\b/i) ||
+    t.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  return m ? m[1] : null;
 }
 
 function extractLocationText(text) {
-  const t = text;
+  const t = String(text || "");
+  const lines = t.split("\n").map(cleanLine).filter(Boolean);
 
-  const labeled = pickFirstMatch(t, [
-    /(?:^|\n)\s*Position\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Location\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-    /(?:^|\n)\s*Port\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-  ]);
-  if (labeled) return labeled;
+  for (const line of lines) {
+    const m = line.match(/^(position|location|port)\s*[:=-]\s*(.+)$/i);
+    if (m && m[2]) {
+      const cand = normSpaces(m[2]).replace(/\(.*?\)/g, "").trim();
+      if (cand.length <= 60) return cand;
+    }
+  }
+
+  // Fallback: "<place> Anchorage" pattern
+  const m2 = t.match(/\b([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3}\s+Anchorage)\b/);
+  if (m2) return m2[1];
 
   return null;
 }
 
-function keywordFlags(text) {
-  const t = (text || "").toLowerCase();
-  const has = (k) => t.includes(k);
+function extractKeywords(text) {
+  const t = String(text || "").toLowerCase();
+  const keys = [];
+  const add = (k, variants) => {
+    if (variants.some((v) => t.includes(v))) keys.push(k);
+  };
 
-  const keywords = [];
-  if (has("collision") || has("contact")) keywords.push("contact");
-  if (has("pollution") || has("spill") || has("oil spill")) keywords.push("pollution");
-  if (has("injury") || has("fatal") || has("death")) keywords.push("injury");
-  if (has("fire") || has("explosion")) keywords.push("fire");
-  if (has("grounding")) keywords.push("grounding");
-  if (has("cargo")) keywords.push("cargo");
-  if (has("theft") || has("piracy")) keywords.push("theft/piracy");
-  if (has("engine") || has("machinery")) keywords.push("machinery");
+  add("contact", ["contact", "allision", "berth", "jetty"]);
+  add("collision", ["collision", "collided"]);
+  add("grounding", ["grounding", "aground"]);
+  add("fire", ["fire", "smoke", "burning"]);
+  add("pollution", ["pollution", "spill", "oil leak", "sheen"]);
+  add("injury", ["injury", "injured", "fatal", "death", "man overboard"]);
+  add("cargo damage", ["cargo damage", "wet cargo", "contamination", "shortage"]);
+  add("machinery", ["main engine", "m/e", "generator", "breakdown", "blackout"]);
 
-  return Array.from(new Set(keywords));
+  return Array.from(new Set(keys));
+}
+
+function extractFromFirstNotification(rawText) {
+  const raw = String(rawText || "");
+  const summary = raw.trim();
+
+  const vesselName = extractVesselName(raw);
+  const imo = extractIMO(raw);
+  const eventDateText = extractEventDateText(raw);
+  const locationText = extractLocationText(raw);
+  const incidentKeywords = extractKeywords(raw);
+
+  return {
+    rawText: raw,
+    summary,
+    vesselName,
+    imo,
+    eventDateText,
+    locationText,
+    incidentKeywords,
+    counterpartyText: null,
+  };
 }
 
 module.exports = {
-  extractFromFirstNotification(text) {
-    const rawText = clean(text) || "";
-    const vesselName = extractVessel(rawText);
-    const imo = extractIMO(rawText);
-    const eventDateText = extractDateText(rawText);
-    const locationText = extractLocationText(rawText);
-
-    const incidentKeywords = keywordFlags(rawText);
-
-    // Simple summary = first 600 chars
-    const summary = rawText.length > 600 ? rawText.slice(0, 600) + "..." : rawText;
-
-    return {
-      rawText,
-      summary,
-      vesselName, // may be null if uncertain
-      imo,
-      eventDateText,
-      locationText,
-      incidentKeywords,
-      counterpartyText: null,
-      ai: {
-        used: false,
-        note: "Deterministic extraction only. AI assist will be used if enabled and fields are missing.",
-      },
-    };
-  },
+  extractFromFirstNotification,
+  extractVesselName,
+  extractIMO,
 };

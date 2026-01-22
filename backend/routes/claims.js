@@ -4,32 +4,32 @@ const express = require("express");
 const router = express.Router();
 
 const {
-  listClaims,
   createClaim,
+  listClaims,
   getClaim,
-  updateProgress,
-  updateFinance,
-  updateAction,
+  patchProgress,
+  patchFinance,
+  patchAction,
+  getDrafts,
   getDueReminders,
-  snoozeActionReminder,
 } = require("../controllers/claimsController");
 
-// List + Create
+// LIST + CREATE
 router.get("/", listClaims);
 router.post("/", createClaim);
 
-// Reminders (place BEFORE /:id so it doesn't get captured as :id)
+// REMINDERS (place before /:id to avoid param conflicts)
 router.get("/reminders/due", getDueReminders);
 
-// Single claim
+// SINGLE CLAIM
 router.get("/:id", getClaim);
 
-// Updates
-router.patch("/:id/progress", updateProgress);
-router.patch("/:id/finance", updateFinance);
+// PATCHES
+router.patch("/:id/progress", patchProgress);
+router.patch("/:id/finance", patchFinance);
+router.patch("/:id/actions/:actionId", patchAction);
 
-// Actions
-router.patch("/:id/actions/:actionId", updateAction);
-router.patch("/:id/actions/:actionId/reminder", snoozeActionReminder);
+// DRAFTS
+router.get("/:id/drafts", getDrafts);
 
 module.exports = router;
