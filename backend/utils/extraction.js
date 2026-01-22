@@ -1,114 +1,149 @@
 // backend/utils/extraction.js
-// AI-first extraction with rule-based fallback.
-// NOTE: This is async now. Caller must await extractFirstNotification().
-
-const { aiExtractFirstNotification } = require("../ai/firstNotificationExtract");
+// Deterministic extractor (v1.1): conservative rules.
+// If uncertain, returns null for vessel/date/location instead of guessing.
 
 function clean(s) {
-  return (s || "").toString().trim();
+  if (!s) return null;
+  const x = String(s).replace(/\r/g, "").trim();
+  return x.length ? x : null;
 }
 
-function findFirstMatch(text, patterns) {
-  for (const p of patterns) {
-    const m = text.match(p);
+function pickFirstMatch(text, patterns) {
+  for (const re of patterns) {
+    const m = text.match(re);
     if (m && m[1]) return clean(m[1]);
   }
   return null;
 }
 
-function extractKeywords(text) {
-  const t = (text || "").toLowerCase();
-  const keywords = [];
+function normalizeVesselName(name) {
+  if (!name) return null;
+  let x = name.trim();
 
-  const map = [
-    ["collision", ["collision", "collided", "allision", "contact"]],
-    ["contact", ["contact", "allision", "berth", "jetty", "quay", "fender"]],
-    ["grounding", ["grounding", "aground", "stranded"]],
-    ["pollution", ["pollution", "spill", "oil leak", "sheen", "bunker spill", "slick"]],
-    ["injury", ["injury", "injured", "fatal", "fatality", "death", "man overboard"]],
-    ["cargo", ["cargo damage", "wet", "contamination", "shortage", "heated", "condensation"]],
-    ["fire", ["fire", "explosion"]],
-    ["machinery", ["machinery", "engine", "main engine", "aux engine", "breakdown"]],
-    ["piracy", ["piracy", "armed robbery", "robbery"]],
-    ["weather", ["heavy weather", "rough weather", "storm", "typhoon", "monsoon"]],
-  ];
+  // Remove trailing punctuation / excessive whitespace
+  x = x.replace(/[;,.\s]+$/g, "").replace(/\s+/g, " ");
 
-  for (const [key, terms] of map) {
-    if (terms.some((w) => t.includes(w))) keywords.push(key);
+  // If it's suspiciously long, it's probably not a vessel name
+  if (x.length > 60) return null;
+
+  // Avoid common false positives
+  const lower = x.toLowerCase();
+  const badStarts = ["incident", "position", "location", "reported", "fire", "damage", "at ", "on "];
+  if (badStarts.some((b) => lower.startsWith(b))) return null;
+
+  return x;
+}
+
+function extractVessel(text) {
+  const t = text;
+
+  // Strong patterns
+  const strong = pickFirstMatch(t, [
+    /(?:^|\n)\s*Vessel\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Ship\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Vsl\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Vessel\s*Name\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+  ]);
+  const strongNorm = normalizeVesselName(strong);
+  if (strongNorm) return strongNorm;
+
+  // MV/MT/MV. in free text (conservative)
+  // e.g. "MV NOVA STAR", "M/V NOVA STAR", "MT NOVA STAR"
+  const m = t.match(/\b(?:M\/V|MV|MT)\s+([A-Z0-9][A-Z0-9\s\-]{2,40})\b/);
+  if (m && m[1]) {
+    const candidate = normalizeVesselName(`${(t.match(/\b(M\/V|MV|MT)\b/) || [])[0] || "MV"} ${m[1]}`.trim());
+    if (candidate) return candidate;
   }
+
+  // If we didn't find a confident vessel name, return null (do NOT guess)
+  return null;
+}
+
+function extractIMO(text) {
+  const t = text;
+  const imo = pickFirstMatch(t, [
+    /(?:^|\n)\s*IMO\s*:\s*(\d{7})\s*(?:\n|$)/i,
+    /\bIMO\s*(\d{7})\b/i,
+  ]);
+  return imo;
+}
+
+function extractDateText(text) {
+  // Accept common formats but keep as text
+  const t = text;
+
+  // Lines like: "22 Jan 2026" or "22 January 2026"
+  const line = pickFirstMatch(t, [
+    /(?:^|\n)\s*(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s*(?:\n|$)/,
+  ]);
+  if (line) return line;
+
+  // "Date: 20 Jan 2026"
+  const labeled = pickFirstMatch(t, [
+    /(?:^|\n)\s*Date\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Incident\s*Date\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+  ]);
+  if (labeled && labeled.length <= 40) return labeled;
+
+  return null;
+}
+
+function extractLocationText(text) {
+  const t = text;
+
+  const labeled = pickFirstMatch(t, [
+    /(?:^|\n)\s*Position\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Location\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+    /(?:^|\n)\s*Port\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+  ]);
+  if (labeled) return labeled;
+
+  return null;
+}
+
+function keywordFlags(text) {
+  const t = (text || "").toLowerCase();
+  const has = (k) => t.includes(k);
+
+  const keywords = [];
+  if (has("collision") || has("contact")) keywords.push("contact");
+  if (has("pollution") || has("spill") || has("oil spill")) keywords.push("pollution");
+  if (has("injury") || has("fatal") || has("death")) keywords.push("injury");
+  if (has("fire") || has("explosion")) keywords.push("fire");
+  if (has("grounding")) keywords.push("grounding");
+  if (has("cargo")) keywords.push("cargo");
+  if (has("theft") || has("piracy")) keywords.push("theft/piracy");
+  if (has("engine") || has("machinery")) keywords.push("machinery");
 
   return Array.from(new Set(keywords));
 }
 
-function ruleBasedExtract(rawText) {
-  const raw = clean(rawText);
-  const text = raw.replace(/\r\n/g, "\n");
+module.exports = {
+  extractFromFirstNotification(text) {
+    const rawText = clean(text) || "";
+    const vesselName = extractVessel(rawText);
+    const imo = extractIMO(rawText);
+    const eventDateText = extractDateText(rawText);
+    const locationText = extractLocationText(rawText);
 
-  const vesselName =
-    findFirstMatch(text, [
-      /Vessel\s*:\s*(.+)/i,
-      /M\/V\s*[:\-]?\s*(.+)/i,
-      /MV\s+([A-Z0-9\-\s]+)/i,
-    ]) || null;
+    const incidentKeywords = keywordFlags(rawText);
 
-  const imo =
-    findFirstMatch(text, [
-      /IMO\s*:\s*([0-9]{7})/i,
-      /IMO\s*No\.?\s*[:\-]?\s*([0-9]{7})/i,
-    ]) || null;
+    // Simple summary = first 600 chars
+    const summary = rawText.length > 600 ? rawText.slice(0, 600) + "..." : rawText;
 
-  const eventDateText =
-    findFirstMatch(text, [/(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/i, /(\d{4}-\d{2}-\d{2})/i]) || null;
-
-  const locationText =
-    findFirstMatch(text, [/Position\s*:\s*(.+)/i, /Location\s*:\s*(.+)/i, /Port\s*:\s*(.+)/i]) || null;
-
-  const counterpartyText =
-    findFirstMatch(text, [/Counterparty\s*:\s*(.+)/i, /Charterer\s*:\s*(.+)/i, /Terminal\s*:\s*(.+)/i]) || null;
-
-  const incidentKeywords = extractKeywords(text);
-
-  return {
-    rawText: raw,
-    summary: raw,
-    vesselName,
-    imo,
-    eventDateText,
-    locationText,
-    incidentKeywords,
-    counterpartyText,
-
-    // extra AI fields (null in fallback)
-    incidentType: null,
-    allegedCause: null,
-    pilotInvolved: null,
-    pollutionReported: null,
-    injuriesReported: null,
-    immediateActionsTaken: [],
-    missingInfoToRequest: [],
-    confidence: 0.45,
-    warnings: ["AI not used; rule-based fallback applied."],
-  };
-}
-
-async function extractFirstNotification(rawText) {
-  const raw = clean(rawText);
-
-  // If no key, fallback immediately
-  if (!process.env.OPENAI_API_KEY) return ruleBasedExtract(raw);
-
-  try {
-    const ai = await aiExtractFirstNotification(raw);
-
-    // If AI returned nothing meaningful, fallback
-    if (!ai || !ai.summary) return ruleBasedExtract(raw);
-
-    return ai;
-  } catch (e) {
-    const fb = ruleBasedExtract(raw);
-    fb.warnings = (fb.warnings || []).concat([`AI extraction failed: ${e.message}`]);
-    return fb;
-  }
-}
-
-module.exports = { extractFirstNotification };
+    return {
+      rawText,
+      summary,
+      vesselName, // may be null if uncertain
+      imo,
+      eventDateText,
+      locationText,
+      incidentKeywords,
+      counterpartyText: null,
+      ai: {
+        used: false,
+        note: "Deterministic extraction only. AI assist will be used if enabled and fields are missing.",
+      },
+    };
+  },
+};
