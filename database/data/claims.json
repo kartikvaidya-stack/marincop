@@ -6,7 +6,7 @@
       "company": "Nova Carriers",
       "createdAt": "2026-01-22T12:59:38.845Z",
       "createdBy": "Kartik",
-      "updatedAt": "2026-01-22T12:59:51.235Z",
+      "updatedAt": "2026-01-22T13:03:25.558Z",
       "progressStatus": "Notification Received",
       "extraction": {
         "rawText": "MV crazy star\nFire in ER\nOff Gibraltar\n15 Jan 2026",
@@ -144,7 +144,7 @@
       "finance": {
         "currency": "USD",
         "reserveEstimated": 100000,
-        "deductible": 0,
+        "deductible": 50000,
         "recovered": 0,
         "outstanding": 100000,
         "notes": ""
@@ -167,6 +167,12 @@
         },
         {
           "at": "2026-01-22T12:59:51.235Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=100000, recovered=0, outstanding=100000)"
+        },
+        {
+          "at": "2026-01-22T13:03:25.558Z",
           "by": "Kartik",
           "action": "FINANCE_UPDATED",
           "note": "Finance updated (reserve=100000, recovered=0, outstanding=100000)"
