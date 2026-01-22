@@ -1,6 +1,179 @@
 {
   "claims": [
     {
+      "id": "468f6e20-aa16-43ff-b95a-50decd368d7b",
+      "claimNumber": "MC-NOVA-2026-0006",
+      "company": "Nova Carriers",
+      "createdAt": "2026-01-22T12:59:38.845Z",
+      "createdBy": "Kartik",
+      "updatedAt": "2026-01-22T12:59:51.235Z",
+      "progressStatus": "Notification Received",
+      "extraction": {
+        "rawText": "MV crazy star\nFire in ER\nOff Gibraltar\n15 Jan 2026",
+        "summary": "MV crazy star\nFire in ER\nOff Gibraltar\n15 Jan 2026",
+        "vesselName": "crazy star\nFire in ER\nOff Gibraltar\n15 Jan 2026",
+        "imo": null,
+        "eventDateText": "15 Jan 2026",
+        "locationText": null,
+        "incidentKeywords": [
+          "fire"
+        ],
+        "counterpartyText": null,
+        "incidentType": null,
+        "allegedCause": null,
+        "pilotInvolved": null,
+        "pollutionReported": null,
+        "injuriesReported": null,
+        "immediateActionsTaken": [],
+        "missingInfoToRequest": [],
+        "confidence": 0.45,
+        "warnings": [
+          "AI not used; rule-based fallback applied."
+        ]
+      },
+      "classification": {
+        "covers": [
+          {
+            "type": "H&M",
+            "confidence": 0.7,
+            "reasoning": "Potential physical damage to the insured vessel / machinery, typically responded under Hull & Machinery, subject to deductible and policy terms."
+          }
+        ]
+      },
+      "actions": [
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A1",
+          "title": "Create claim file and preserve evidence",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A2",
+          "title": "Confirm cover(s) and notify relevant insurers/club",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A3",
+          "title": "Collect supporting documents (log extracts, photos, reports)",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A4",
+          "title": "Appoint / confirm surveyor (if required)",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A5",
+          "title": "Establish initial reserve (estimate) and deductible impact",
+          "ownerRole": "Finance",
+          "dueAt": "2026-01-24T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A6",
+          "title": "Track updates and maintain status log",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-22T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A7",
+          "title": "Identify third-party involvement and liability exposure",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A8",
+          "title": "Obtain statements (Master/crew) and incident report",
+          "ownerRole": "Ops",
+          "dueAt": "2026-01-23T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        },
+        {
+          "id": "468f6e20-aa16-43ff-b95a-50decd368d7b-A9",
+          "title": "Notify relevant correspondents / local agents if needed",
+          "ownerRole": "Claims",
+          "dueAt": "2026-01-23T12:59:38.845Z",
+          "status": "OPEN",
+          "createdAt": "2026-01-22T12:59:38.845Z",
+          "updatedAt": "2026-01-22T12:59:38.845Z",
+          "reminderAt": null,
+          "notes": ""
+        }
+      ],
+      "finance": {
+        "currency": "USD",
+        "reserveEstimated": 100000,
+        "deductible": 0,
+        "recovered": 0,
+        "outstanding": 100000,
+        "notes": ""
+      },
+      "files": [],
+      "statusLog": [
+        {
+          "at": "2026-01-22T12:59:38.845Z",
+          "by": "Kartik",
+          "status": "Notification Received",
+          "note": "Claim created from first notification."
+        }
+      ],
+      "auditTrail": [
+        {
+          "at": "2026-01-22T12:59:38.845Z",
+          "by": "Kartik",
+          "action": "STATUS_LOG_IMPORTED",
+          "note": "Notification Received - Claim created from first notification."
+        },
+        {
+          "at": "2026-01-22T12:59:51.235Z",
+          "by": "Kartik",
+          "action": "FINANCE_UPDATED",
+          "note": "Finance updated (reserve=100000, recovered=0, outstanding=100000)"
+        }
+      ]
+    },
+    {
       "id": "3d533133-5c38-4223-b046-e9d84b1459eb",
       "claimNumber": "MC-NOVA-2026-0005",
       "company": "Nova Carriers",
