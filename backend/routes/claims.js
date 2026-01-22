@@ -21,6 +21,9 @@ router.post("/", createClaim);
 // REMINDERS (place before /:id to avoid param conflicts)
 router.get("/reminders/due", getDueReminders);
 
+// IMPORTANT: put drafts BEFORE "/:id"
+router.get("/:id/drafts", getDrafts);
+
 // SINGLE CLAIM
 router.get("/:id", getClaim);
 
@@ -28,8 +31,5 @@ router.get("/:id", getClaim);
 router.patch("/:id/progress", patchProgress);
 router.patch("/:id/finance", patchFinance);
 router.patch("/:id/actions/:actionId", patchAction);
-
-// DRAFTS
-router.get("/:id/drafts", getDrafts);
 
 module.exports = router;
