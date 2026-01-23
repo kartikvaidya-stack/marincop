@@ -2,179 +2,124 @@
 
 const claimService = require("../services/claimService");
 
-function bodyOrEmpty(req) {
-  return (req && req.body && typeof req.body === "object") ? req.body : {};
+function ok(res, data) {
+  return res.json({ ok: true, data });
 }
 
-function sendNotFound(res, msg) {
-  return res.status(404).json({ ok: false, error: "NotFound", message: msg || "Not found" });
+function fail(res, status, error, message, extra = {}) {
+  return res.status(status).json({ ok: false, error, message, ...extra });
 }
 
-function sendBadRequest(res, msg) {
-  return res.status(400).json({ ok: false, error: "BadRequest", message: msg || "Bad request" });
-}
-
-async function createClaim(req, res) {
+// POST /api/claims
+exports.createClaim = (req, res) => {
   try {
-    const b = bodyOrEmpty(req);
-    const createdBy = b.createdBy || "System";
-    const firstNotificationText = b.firstNotificationText || "";
-
-    if (!firstNotificationText.trim()) {
-      return sendBadRequest(res, "firstNotificationText is required.");
+    const { createdBy, firstNotificationText } = req.body || {};
+    if (!firstNotificationText) {
+      return fail(res, 400, "BadRequest", "firstNotificationText is required");
     }
-
-    const claim = await claimService.createClaim({
-      company: "Nova Carriers",
-      createdBy,
-      firstNotificationText,
-    });
-
-    return res.json({ ok: true, data: claim });
+    const created = claimService.createClaim({ createdBy, firstNotificationText });
+    return ok(res, created);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function listClaims(req, res) {
+// GET /api/claims
+exports.listClaims = (req, res) => {
   try {
-    const data = claimService.getClaims ? claimService.getClaims() : claimService.listClaims();
-    return res.json({ ok: true, data });
+    const data = claimService.listClaims();
+    return ok(res, data);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function getClaim(req, res) {
+// GET /api/claims/:id
+exports.getClaim = (req, res) => {
   try {
     const id = req.params.id;
-    if (!id) return sendBadRequest(res, "Missing claim id.");
-
-    const claim = claimService.getClaim ? claimService.getClaim(id) : claimService.getClaimById(id);
-    if (!claim) return sendNotFound(res, "Claim not found");
-
-    return res.json({ ok: true, data: claim });
+    const claim = claimService.getClaim(id);
+    if (!claim) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, claim);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function patchProgress(req, res) {
+// PATCH /api/claims/:id/progress
+exports.patchProgress = (req, res) => {
   try {
     const id = req.params.id;
-    if (!id) return sendBadRequest(res, "Missing claim id.");
+    const { by, progressStatus } = req.body || {};
+    if (!by) return fail(res, 400, "BadRequest", "by is required");
+    if (!progressStatus) return fail(res, 400, "BadRequest", "progressStatus is required");
 
-    const b = bodyOrEmpty(req);
-    const by = b.by || "System";
-    const progressStatus = b.progressStatus || "";
-
-    if (!progressStatus.trim()) {
-      return sendBadRequest(res, "progressStatus is required.");
-    }
-
-    const updated = claimService.patchProgress
-      ? claimService.patchProgress(id, { by, progressStatus })
-      : claimService.updateProgress(id, { by, progressStatus });
-
-    if (!updated) return sendNotFound(res, "Claim not found");
-
-    return res.json({ ok: true, data: updated });
+    const updated = claimService.updateProgressStatus(id, { by, progressStatus });
+    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, updated);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function patchFinance(req, res) {
+// PATCH /api/claims/:id/finance
+exports.patchFinance = (req, res) => {
   try {
     const id = req.params.id;
-    if (!id) return sendBadRequest(res, "Missing claim id.");
 
-    const b = bodyOrEmpty(req);
-    const by = b.by || "System";
-    const finance = (b.finance && typeof b.finance === "object") ? b.finance : {};
+    // IMPORTANT: do not destructure fields here; pass the object through so "paid" is supported
+    const by = req.body?.by;
+    const finance = req.body?.finance;
 
-    const updated = claimService.patchFinance
-      ? claimService.patchFinance(id, { by, finance })
-      : claimService.updateFinance(id, { by, finance });
+    if (!by) return fail(res, 400, "BadRequest", "by is required");
+    if (!finance) return fail(res, 400, "BadRequest", "finance object is required");
 
-    if (!updated) return sendNotFound(res, "Claim not found");
-
-    return res.json({ ok: true, data: updated });
+    const updated = claimService.updateFinance(id, finance, by);
+    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, updated);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function patchAction(req, res) {
+// PATCH /api/claims/:id/actions/:actionId
+exports.patchAction = (req, res) => {
   try {
     const id = req.params.id;
     const actionId = req.params.actionId;
+    const { by, status, notes, reminderAt } = req.body || {};
 
-    if (!id) return sendBadRequest(res, "Missing claim id.");
-    if (!actionId) return sendBadRequest(res, "Missing action id.");
+    if (!by) return fail(res, 400, "BadRequest", "by is required");
+    if (!status && !notes && typeof reminderAt === "undefined") {
+      return fail(res, 400, "BadRequest", "Provide at least one of: status, notes, reminderAt");
+    }
 
-    const b = bodyOrEmpty(req);
-    const by = b.by || "System";
-
-    const updated = claimService.patchAction
-      ? claimService.patchAction(id, actionId, {
-          by,
-          status: b.status,
-          notes: b.notes,
-          reminderAt: b.reminderAt,
-        })
-      : claimService.updateAction(id, actionId, {
-          by,
-          status: b.status,
-          notes: b.notes,
-          reminderAt: b.reminderAt,
-        });
-
-    if (!updated) return sendNotFound(res, "Claim or action not found");
-
-    // Some routes return action only; we return updated claim (more useful)
-    return res.json({ ok: true, data: updated });
+    const updated = claimService.updateAction(id, actionId, { by, status, notes, reminderAt });
+    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, updated);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function getDrafts(req, res) {
+// GET /api/claims/:id/drafts
+exports.getDrafts = (req, res) => {
   try {
     const id = req.params.id;
-    if (!id) return sendBadRequest(res, "Missing claim id.");
-
-    const drafts = claimService.getDrafts
-      ? claimService.getDrafts(id)
-      : claimService.generateDraftTemplates(id);
-
-    if (!drafts) return sendNotFound(res, "Claim not found");
-
-    return res.json({ ok: true, data: drafts });
+    const drafts = claimService.getDrafts(id);
+    if (!drafts) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, drafts);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
+};
 
-function getDueReminders(req, res) {
+// GET /api/claims/reminders/due
+exports.getDueReminders = (req, res) => {
   try {
-    const data = claimService.getRemindersDue
-      ? claimService.getRemindersDue()
-      : claimService.getDueReminders();
-
-    return res.json({ ok: true, data });
+    const data = claimService.getDueReminders();
+    return ok(res, data);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "ServerError", message: e?.message || String(e) });
+    return fail(res, 500, "TypeError", e?.message || "Unknown error");
   }
-}
-
-module.exports = {
-  createClaim,
-  listClaims,
-  getClaim,
-  patchProgress,
-  patchFinance,
-  patchAction,
-  getDrafts,
-  getDueReminders,
 };

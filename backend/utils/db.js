@@ -1,41 +1,64 @@
 // backend/utils/db.js
-// Uses /marincop/database/data/claims.json as storage (existing project structure)
-
 const fs = require("fs");
 const path = require("path");
 
-// IMPORTANT: This matches your existing data location
-const DB_PATH = path.join(process.cwd(), "database", "data", "claims.json");
+// Where we store data
+const DATA_DIR = path.join(process.cwd(), "database", "data");
+const CLAIMS_FILE = path.join(DATA_DIR, "claims.json");
 
-function ensureDbFile() {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  if (!fs.existsSync(DB_PATH)) {
-    const initial = { claims: [] };
-    fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2), "utf-8");
-  }
+// Ensure folders/files exist
+function ensureFiles() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(CLAIMS_FILE)) fs.writeFileSync(CLAIMS_FILE, JSON.stringify([], null, 2));
 }
 
-function loadDb() {
-  ensureDbFile();
-  const raw = fs.readFileSync(DB_PATH, "utf-8");
+// Read claims array
+function loadDB() {
+  ensureFiles();
+  const raw = fs.readFileSync(CLAIMS_FILE, "utf-8");
+  let claims = [];
   try {
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== "object") return { claims: [] };
-    if (!Array.isArray(data.claims)) data.claims = [];
-    return data;
+    claims = JSON.parse(raw);
+    if (!Array.isArray(claims)) claims = [];
   } catch {
-    // If file is corrupted, recover safely (but do NOT delete old file)
-    return { claims: [] };
+    claims = [];
   }
+  return { claims };
 }
 
-function saveDb(db) {
-  ensureDbFile();
-  const safe = db && typeof db === "object" ? db : { claims: [] };
-  if (!Array.isArray(safe.claims)) safe.claims = [];
-  fs.writeFileSync(DB_PATH, JSON.stringify(safe, null, 2), "utf-8");
+// Write claims array
+function saveDB(db) {
+  ensureFiles();
+  const claims = Array.isArray(db?.claims) ? db.claims : [];
+  fs.writeFileSync(CLAIMS_FILE, JSON.stringify(claims, null, 2));
 }
 
-module.exports = { loadDb, saveDb, DB_PATH };
+// Make sure db has correct shape
+function ensureDBShape(db) {
+  if (!db || typeof db !== "object") return { claims: [] };
+  if (!Array.isArray(db.claims)) db.claims = [];
+  return db;
+}
+
+// Claim numbering helper
+function nextClaimSequenceForYear(db, year) {
+  const claims = Array.isArray(db?.claims) ? db.claims : [];
+  const prefix = `MC-NOVA-${year}-`;
+
+  let maxSeq = 0;
+  for (const c of claims) {
+    const num = c?.claimNumber || "";
+    if (!num.startsWith(prefix)) continue;
+    const tail = num.slice(prefix.length);
+    const n = parseInt(tail, 10);
+    if (!Number.isNaN(n)) maxSeq = Math.max(maxSeq, n);
+  }
+  return maxSeq + 1;
+}
+
+module.exports = {
+  loadDB,
+  saveDB,
+  ensureDBShape,
+  nextClaimSequenceForYear,
+};
