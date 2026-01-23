@@ -42,7 +42,7 @@ function TopBar() {
             <NavLink href="/finance">Finance</NavLink>
             <NavLink href="/reminders">Reminders</NavLink>
             <NavLink href="/insights">Insights</NavLink>
-            <span style={pillMuted}>Settings (next)</span>
+          
           </div>
 
           <div style={{ marginLeft: "auto", color: "#667085", fontSize: 12 }}>
