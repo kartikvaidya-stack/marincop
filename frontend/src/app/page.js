@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import styles from "./dashboard.module.css";
+import { useEffect, useMemo, useState } from "react";
 
 function money(n) {
   const x = Number(n || 0);
-  if (!Number.isFinite(x)) return "0";
   return x.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
@@ -14,20 +12,17 @@ export default function HomePage() {
   const [claims, setClaims] = useState([]);
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
 
   async function load() {
+    setErr("");
     try {
-      setLoading(true);
-      setErr("");
       const res = await fetch("/api/claims", { cache: "no-store" });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.message || "Failed to load claims");
-      setClaims(json.data || []);
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      setClaims(rows);
     } catch (e) {
-      setErr(e?.message || "Failed to fetch");
-    } finally {
-      setLoading(false);
+      setClaims([]);
+      setErr("Failed to fetch claims.");
     }
   }
 
@@ -36,131 +31,123 @@ export default function HomePage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return claims;
+    const s = q.trim().toLowerCase();
+    if (!s) return claims;
     return claims.filter((c) => {
       const covers = Array.isArray(c.covers) ? c.covers.join(",") : "";
       return (
-        String(c.claimNumber || "").toLowerCase().includes(t) ||
-        String(c.vesselName || "").toLowerCase().includes(t) ||
-        String(c.progressStatus || "").toLowerCase().includes(t) ||
-        String(covers).toLowerCase().includes(t)
+        String(c.claimNumber || "").toLowerCase().includes(s) ||
+        String(c.vesselName || "").toLowerCase().includes(s) ||
+        String(c.progressStatus || "").toLowerCase().includes(s) ||
+        covers.toLowerCase().includes(s)
       );
     });
-  }, [q, claims]);
+  }, [claims, q]);
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <div className={styles.brand}>Marincop</div>
-          <div className={styles.subBrand}>Nova Carriers</div>
-        </div>
-
-        <nav className={styles.nav}>
-          <Link className={styles.navItemActive} href="/">Claims</Link>
-          <Link className={styles.navItem} href="/new-claim">New Claim</Link>
-          <Link className={styles.navItem} href="/finance">Finance</Link>
-          <Link className={styles.navItem} href="/reminders">Reminders</Link>
-          <Link className={styles.navItem} href="/insights">Insights</Link>
-          {/* Settings removed from nav (as per your feedback #1 earlier) */}
-        </nav>
-      </header>
-
-      <section className={styles.card}>
-        <div className={styles.cardTop}>
+    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto", background: "#f6f8fb", minHeight: "100vh" }}>
+      {/* Top bar */}
+      <div style={{ background: "white", borderBottom: "1px solid #e6eaf2" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <h1 className={styles.h1}>Claims Dashboard</h1>
-            <div className={styles.h2}>
-              Marine insurance case management • templates drafting • finance exposure
-            </div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Marincop</div>
+            <div style={{ fontSize: 12, color: "#556" }}>Nova Carriers • Light UI • Internal tool</div>
           </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Link href="/" style={{ textDecoration: "none", color: "#223", fontWeight: 600 }}>Claims</Link>
+            <Link href="/new-claim" style={{ textDecoration: "none", color: "#223" }}>New Claim</Link>
+            <Link href="/finance" style={{ textDecoration: "none", color: "#223" }}>Finance</Link>
+            <Link href="/reminders" style={{ textDecoration: "none", color: "#223" }}>Reminders</Link>
+            <Link href="/insights" style={{ textDecoration: "none", color: "#223" }}>Insights</Link>
+          </div>
+        </div>
+      </div>
 
-          <div className={styles.actions}>
-            <button className={styles.btn} onClick={load} disabled={loading}>
-              {loading ? "Refreshing…" : "Refresh"}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>Claims Dashboard</div>
+            <div style={{ color: "#556", fontSize: 13 }}>Marine insurance case management • templates drafting • finance exposure</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button onClick={load} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #d7deea", background: "white", cursor: "pointer" }}>
+              Refresh
             </button>
           </div>
         </div>
 
-        <div className={styles.searchRow}>
-          <input
-            className={styles.search}
-            placeholder="Search claim #, vessel, cover, status…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <div className={styles.envPill}>Environment: {process.env.NEXT_PUBLIC_ENV_LABEL || "Live"}</div>
-        </div>
+        {err ? (
+          <div style={{ background: "#fff1f1", border: "1px solid #ffd0d0", color: "#900", padding: 12, borderRadius: 12, marginBottom: 12 }}>
+            Error: {err}
+          </div>
+        ) : null}
 
-        {err ? <div className={styles.error}>Error: {err}</div> : null}
+        <div style={{ background: "white", border: "1px solid #e6eaf2", borderRadius: 14, padding: 12 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search claim #, vessel, cover, status…"
+              style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #d7deea", outline: "none" }}
+            />
+            <Link href="/new-claim" style={{ padding: "10px 12px", borderRadius: 10, background: "#0b5cff", color: "white", textDecoration: "none", fontWeight: 700 }}>
+              + New Claim
+            </Link>
+          </div>
 
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Claim #</th>
-                <th className={styles.th}>Vessel</th>
-                <th className={styles.th}>Status</th>
-                <th className={styles.th}>Covers</th>
-
-                <th className={`${styles.th} ${styles.num}`}>
-                  <span className={styles.thWrap}>Reserve</span>
-                </th>
-
-                <th className={`${styles.th} ${styles.num}`}>
-                  <span className={styles.thWrap}>Cash Out</span>
-                </th>
-
-                <th className={`${styles.th} ${styles.num}`}>
-                  <span className={styles.thWrap}>Recoverable</span>
-                </th>
-
-                <th className={`${styles.th} ${styles.num}`}>
-                  <span className={styles.thWrap}>Recovered</span>
-                </th>
-
-                <th className={`${styles.th} ${styles.num}`}>
-                  <span className={styles.thWrap}>Outstanding<br />Recovery</span>
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td className={styles.td} colSpan={9}>
-                    No claims found.
-                  </td>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead>
+                <tr style={{ textAlign: "left", fontSize: 12, color: "#556" }}>
+                  <th style={{ padding: "10px 8px" }}>Claim #</th>
+                  <th style={{ padding: "10px 8px" }}>Vessel</th>
+                  <th style={{ padding: "10px 8px" }}>Status</th>
+                  <th style={{ padding: "10px 8px" }}>Covers</th>
+                  <th style={{ padding: "10px 8px" }}>Cash Out</th>
+                  <th style={{ padding: "10px 8px" }}>Recovered</th>
+                  <th style={{ padding: "10px 8px" }}>
+                    Outstanding<br />Recovery
+                  </th>
                 </tr>
-              ) : (
-                filtered.map((c) => (
-                  <tr key={c.id} className={styles.row}>
-                    <td className={styles.td}>
-                      <Link className={styles.claimLink} href={`/claims/${c.id}`}>
-                        {c.claimNumber}
-                      </Link>
-                    </td>
-                    <td className={styles.td}>{c.vesselName || "—"}</td>
-                    <td className={styles.td}>{c.progressStatus || "—"}</td>
-                    <td className={styles.td}>{(c.covers || []).join(", ") || "—"}</td>
-
-                    <td className={`${styles.td} ${styles.num}`}>{money(c.reserveEstimated)}</td>
-                    <td className={`${styles.td} ${styles.num}`}>{money(c.cashOut)}</td>
-                    <td className={`${styles.td} ${styles.num}`}>{money(c.recoverableExpected)}</td>
-                    <td className={`${styles.td} ${styles.num}`}>{money(c.recovered)}</td>
-                    <td className={`${styles.td} ${styles.num}`}>{money(c.outstandingRecovery)}</td>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 12, color: "#667" }}>No claims found.</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filtered.map((c, idx) => {
+                    const covers = Array.isArray(c.covers) ? c.covers.join(", ") : "";
+                    const cashOut = c.cashOut ?? c.paid ?? 0;
+                    const recovered = c.recovered ?? 0;
+                    const outstanding = c.outstandingRecovery ?? c.outstanding ?? 0;
 
-        <div className={styles.tip}>
-          Tip: Click the claim number to open the claim detail page.
+                    return (
+                      <tr key={c.id} style={{ background: idx % 2 ? "#fbfcff" : "white" }}>
+                        <td style={{ padding: "10px 8px", fontWeight: 800 }}>
+                          <Link href={`/claims/${c.id}`} style={{ color: "#0b5cff", textDecoration: "none" }}>
+                            {c.claimNumber || "—"}
+                          </Link>
+                        </td>
+                        <td style={{ padding: "10px 8px" }}>{c.vesselName || "—"}</td>
+                        <td style={{ padding: "10px 8px" }}>{c.progressStatus || "—"}</td>
+                        <td style={{ padding: "10px 8px" }}>{covers || "—"}</td>
+                        <td style={{ padding: "10px 8px" }}>{money(cashOut)}</td>
+                        <td style={{ padding: "10px 8px" }}>{money(recovered)}</td>
+                        <td style={{ padding: "10px 8px" }}>{money(outstanding)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: 10, fontSize: 12, color: "#667" }}>
+            Tip: Click the claim number to open the claim detail page.
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
