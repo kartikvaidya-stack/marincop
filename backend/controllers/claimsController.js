@@ -1,5 +1,4 @@
 // backend/controllers/claimsController.js
-
 const claimService = require("../services/claimService");
 
 function ok(res, data) {
@@ -10,116 +9,107 @@ function fail(res, status, error, message, extra = {}) {
   return res.status(status).json({ ok: false, error, message, ...extra });
 }
 
-// POST /api/claims
-exports.createClaim = (req, res) => {
-  try {
-    const { createdBy, firstNotificationText } = req.body || {};
-    if (!firstNotificationText) {
-      return fail(res, 400, "BadRequest", "firstNotificationText is required");
-    }
-    const created = claimService.createClaim({ createdBy, firstNotificationText });
-    return ok(res, created);
-  } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
-  }
-};
-
-// GET /api/claims
-exports.listClaims = (req, res) => {
+async function listClaims(req, res) {
   try {
     const data = claimService.listClaims();
     return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to list claims");
   }
-};
+}
 
-// GET /api/claims/:id
-exports.getClaim = (req, res) => {
+async function createClaim(req, res) {
+  try {
+    const { createdBy, company, firstNotificationText } = req.body || {};
+    if (!firstNotificationText) return fail(res, 400, "BadRequest", "firstNotificationText is required");
+    const data = claimService.createClaim({ createdBy, company, firstNotificationText });
+    return ok(res, data);
+  } catch (e) {
+    return fail(res, 500, "ServerError", e.message || "Failed to create claim");
+  }
+}
+
+async function getClaim(req, res) {
   try {
     const id = req.params.id;
-    const claim = claimService.getClaim(id);
-    if (!claim) return fail(res, 404, "NotFound", "Claim not found");
-    return ok(res, claim);
+    const data = claimService.getClaim(id);
+    if (!data) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to load claim");
   }
-};
+}
 
-// PATCH /api/claims/:id/progress
-exports.patchProgress = (req, res) => {
+async function patchProgress(req, res) {
   try {
     const id = req.params.id;
     const { by, progressStatus } = req.body || {};
-    if (!by) return fail(res, 400, "BadRequest", "by is required");
     if (!progressStatus) return fail(res, 400, "BadRequest", "progressStatus is required");
 
-    const updated = claimService.updateProgressStatus(id, { by, progressStatus });
-    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
-    return ok(res, updated);
+    const data = claimService.patchProgress({ id, by, progressStatus });
+    if (!data) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, { id, progressStatus: data.progressStatus });
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to patch progress");
   }
-};
+}
 
-// PATCH /api/claims/:id/finance
-exports.patchFinance = (req, res) => {
+async function patchFinance(req, res) {
   try {
     const id = req.params.id;
-
-    // IMPORTANT: do not destructure fields here; pass the object through so "paid" is supported
-    const by = req.body?.by;
-    const finance = req.body?.finance;
-
-    if (!by) return fail(res, 400, "BadRequest", "by is required");
+    const { by, finance } = req.body || {};
     if (!finance) return fail(res, 400, "BadRequest", "finance object is required");
 
-    const updated = claimService.updateFinance(id, finance, by);
-    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
-    return ok(res, updated);
+    const data = claimService.patchFinance({ id, by, finance });
+    if (!data) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to patch finance");
   }
-};
+}
 
-// PATCH /api/claims/:id/actions/:actionId
-exports.patchAction = (req, res) => {
+async function patchAction(req, res) {
   try {
     const id = req.params.id;
     const actionId = req.params.actionId;
+
     const { by, status, notes, reminderAt } = req.body || {};
+    const data = claimService.patchAction({ id, actionId, by, status, notes, reminderAt });
 
-    if (!by) return fail(res, 400, "BadRequest", "by is required");
-    if (!status && !notes && typeof reminderAt === "undefined") {
-      return fail(res, 400, "BadRequest", "Provide at least one of: status, notes, reminderAt");
-    }
-
-    const updated = claimService.updateAction(id, actionId, { by, status, notes, reminderAt });
-    if (!updated) return fail(res, 404, "NotFound", "Claim not found");
-    return ok(res, updated);
+    if (!data) return fail(res, 404, "NotFound", "Claim/action not found");
+    return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to patch action");
   }
-};
+}
 
-// GET /api/claims/:id/drafts
-exports.getDrafts = (req, res) => {
+async function getDrafts(req, res) {
   try {
     const id = req.params.id;
-    const drafts = claimService.getDrafts(id);
-    if (!drafts) return fail(res, 404, "NotFound", "Claim not found");
-    return ok(res, drafts);
+    const data = claimService.getDrafts(id);
+    if (!data) return fail(res, 404, "NotFound", "Claim not found");
+    return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to get drafts");
   }
-};
+}
 
-// GET /api/claims/reminders/due
-exports.getDueReminders = (req, res) => {
+async function getDueReminders(req, res) {
   try {
     const data = claimService.getDueReminders();
     return ok(res, data);
   } catch (e) {
-    return fail(res, 500, "TypeError", e?.message || "Unknown error");
+    return fail(res, 500, "ServerError", e.message || "Failed to load reminders");
   }
+}
+
+module.exports = {
+  listClaims,
+  createClaim,
+  getClaim,
+  patchProgress,
+  patchFinance,
+  patchAction,
+  getDrafts,
+  getDueReminders,
 };

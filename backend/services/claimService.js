@@ -1,433 +1,324 @@
 // backend/services/claimService.js
 const { v4: uuidv4 } = require("uuid");
-const { loadDB, saveDB, ensureDBShape, nextClaimSequenceForYear } = require("../utils/db");
 
-// -------------------------
-// 1) SIMPLE EXTRACTION (robust enough for MVP)
-// -------------------------
-function extractFirstNotification(rawText = "") {
-  const text = String(rawText || "");
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-
-  const findByRegex = (re) => {
-    for (const l of lines) {
-      const m = l.match(re);
-      if (m && m[1]) return m[1].trim();
+/**
+ * Robust importer: tries multiple filenames to avoid MODULE_NOT_FOUND
+ * (your project has had different util filenames across iterations).
+ */
+function requireFirst(paths) {
+  for (const p of paths) {
+    try {
+      return require(p);
+    } catch (e) {
+      // keep trying
     }
-    return null;
-  };
-
-  // Vessel patterns: "Vessel: MV XXX", "M/V XXX", "MV XXX", "MT XXX"
-  let vesselName =
-    findByRegex(/^(?:vessel|ship)\s*[:\-]\s*(.+)$/i) ||
-    findByRegex(/^(?:m\/v|mv|m\.v\.|mt|m\/t)\s+(.+)$/i);
-
-  // If still missing, try to detect "MV NOVA STAR" anywhere
-  if (!vesselName) {
-    const m = text.match(/\b(M\/V|MV|M\.V\.|M\/T|MT)\s+([A-Z0-9][A-Z0-9 \-]{2,})/i);
-    if (m && m[2]) vesselName = `${m[1].toUpperCase().replace(".", "")} ${m[2].trim()}`.replace(/\s+/g, " ");
   }
+  const err = new Error(
+    "Error: Marincop import error. Tried:\n- " + paths.join("\n- ")
+  );
+  throw err;
+}
 
-  const imo = findByRegex(/^(?:imo)\s*[:\-]\s*(\d{7})/i) || (text.match(/\bIMO[:\s]*([0-9]{7})\b/i)?.[1] || null);
+function nowIso() {
+  return new Date().toISOString();
+}
 
-  // Date (very loose; you can improve later)
-  const eventDateText =
-    findByRegex(/^(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})$/) ||
-    findByRegex(/^(?:date)\s*[:\-]\s*(.+)$/i) ||
-    (text.match(/\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b/)?.[1] || null);
+/** Safely get a function by trying multiple possible export names */
+function pickFn(mod, names, label) {
+  for (const n of names) {
+    if (mod && typeof mod[n] === "function") return mod[n];
+  }
+  throw new Error(`Marincop: missing function for ${label}. Tried: ${names.join(", ")}`);
+}
 
-  // Location / position
-  const locationText =
-    findByRegex(/^(?:position|location)\s*[:\-]\s*(.+)$/i) ||
-    findByRegex(/^(?:at)\s+(.+)$/i) ||
-    null;
+/** -------------------------
+ *  Load utils (robust)
+ *  ------------------------- */
+const dbMod = requireFirst(["../utils/db", "../utils/dbUtil", "../utils/dbUtils"]);
+const loadDB = pickFn(dbMod, ["loadDB", "loadDb"], "loadDB");
+const saveDB = pickFn(dbMod, ["saveDB", "saveDb"], "saveDB");
+const ensureDBShape = pickFn(dbMod, ["ensureDBShape", "ensureDbShape"], "ensureDBShape");
+const nextClaimSequenceForYear = pickFn(
+  dbMod,
+  ["nextClaimSequenceForYear", "nextClaimSequence", "nextSequenceForYear"],
+  "nextClaimSequenceForYear"
+);
 
-  // Keywords
-  const lower = text.toLowerCase();
-  const incidentKeywords = [];
-  const kw = [
-    "collision", "contact", "grounding", "fire", "explosion", "flooding",
-    "pollution", "spill", "injury", "death", "cargo", "damage", "theft",
-    "piracy", "detention", "salvage", "towage", "off-hire", "hire"
-  ];
-  for (const k of kw) if (lower.includes(k)) incidentKeywords.push(k);
+const extractionUtil = requireFirst(["../utils/extractionUtil", "../utils/extraction"]);
+const extractFromFirstNotification = pickFn(
+  extractionUtil,
+  ["extractFromFirstNotification", "extract", "extractFirstNotification"],
+  "extractFromFirstNotification"
+);
 
-  // Counterparty hint (optional)
-  const counterpartyText = null;
+const classificationUtil = requireFirst(["../utils/classificationUtil", "../utils/classification"]);
+const classifyFromExtraction = pickFn(
+  classificationUtil,
+  ["classifyFromExtraction", "classify"],
+  "classifyFromExtraction"
+);
 
-  // Summary: keep first 8 lines
-  const summary = lines.slice(0, 8).join("\n");
+const actionsUtil = requireFirst(["../utils/actionsUtil", "../utils/actions", "../utils/actionUtil"]);
+const defaultActionsForClassification = pickFn(
+  actionsUtil,
+  ["defaultActionsForClassification", "defaultActions", "buildDefaultActions"],
+  "defaultActionsForClassification"
+);
+
+const draftsUtil = requireFirst(["../utils/draftsUtil", "../utils/drafts"]);
+const generateDrafts = pickFn(
+  draftsUtil,
+  ["generateDrafts", "buildDrafts", "draftsForClaim"],
+  "generateDrafts"
+);
+
+/**
+ * Owner-view finance model (Nova POV):
+ * - reserveEstimated: insurer reserve (exposure)
+ * - cashOut: owner's cash paid out (keeps increasing)
+ * - deductible: owner's deductible
+ * - recoverableExpected = max(0, cashOut - deductible)
+ * - recovered: cash received back (insurers/third parties)
+ * - outstandingRecovery = max(0, recoverableExpected - recovered)
+ */
+function normalizeFinance(input = {}, existing = {}) {
+  const currency = input.currency ?? existing.currency ?? "USD";
+
+  const reserveEstimated = Number.isFinite(Number(input.reserveEstimated))
+    ? Number(input.reserveEstimated)
+    : Number(existing.reserveEstimated || 0);
+
+  const cashOut = Number.isFinite(Number(input.cashOut))
+    ? Number(input.cashOut)
+    : Number(existing.cashOut || 0);
+
+  const deductible = Number.isFinite(Number(input.deductible))
+    ? Number(input.deductible)
+    : Number(existing.deductible || 0);
+
+  const recovered = Number.isFinite(Number(input.recovered))
+    ? Number(input.recovered)
+    : Number(existing.recovered || 0);
+
+  const notes = input.notes !== undefined ? String(input.notes || "") : String(existing.notes || "");
+
+  const recoverableExpected = Math.max(0, cashOut - deductible);
+  const outstandingRecovery = Math.max(0, recoverableExpected - recovered);
 
   return {
-    rawText: text,
-    summary,
-    vesselName: vesselName || null,
-    imo: imo || null,
-    eventDateText: eventDateText || null,
-    locationText: locationText || null,
-    incidentKeywords,
-    counterpartyText,
+    currency,
+    reserveEstimated,
+    cashOut,
+    deductible,
+    recoverableExpected,
+    recovered,
+    outstandingRecovery,
+    notes,
   };
 }
 
-// -------------------------
-// 2) CLASSIFICATION (includes Charterers’ Liability)
-// -------------------------
-function classifyFromExtraction(extraction) {
-  const t = (extraction?.rawText || "").toLowerCase();
-  const k = new Set(extraction?.incidentKeywords || []);
+function ensureClaimShape(claim) {
+  if (!claim.finance) claim.finance = normalizeFinance({}, {});
+  else claim.finance = normalizeFinance({}, claim.finance);
 
-  const covers = [];
-
-  const add = (type, confidence, reasoning) => {
-    covers.push({ type, confidence, reasoning });
-  };
-
-  // P&I: third-party liabilities (contact/collision/pollution/injury)
-  if (k.has("pollution") || k.has("spill") || k.has("injury") || k.has("death") || k.has("collision") || k.has("contact")) {
-    add("P&I", 0.85, "Indicates potential third-party liabilities (contact/collision, injury, pollution, damage to third-party property).");
-  }
-
-  // H&M: physical damage to the vessel itself (denting, hull, machinery)
-  if (t.includes("denting") || t.includes("shell plating") || t.includes("hull") || t.includes("machinery") || k.has("grounding") || k.has("fire") || t.includes("damage to vessel")) {
-    add("H&M", 0.75, "Indicates potential physical damage to the vessel (hull/machinery).");
-  }
-
-  // Cargo: damage/loss to cargo
-  if (t.includes("cargo") && (t.includes("damage") || t.includes("wet") || t.includes("smoke") || t.includes("fire") || t.includes("loss"))) {
-    add("Cargo", 0.70, "Text indicates cargo damage/loss exposure.");
-  }
-
-  // Charterers’ Liability: explicitly charterer role + CP / hire / off-hire / instructions
-  const chartererSignals =
-    t.includes("as charterer") ||
-    t.includes("charterer") ||
-    t.includes("chartered by") ||
-    t.includes("time charter") ||
-    t.includes("voyage charter") ||
-    t.includes("cp ") ||
-    t.includes("charterparty") ||
-    t.includes("hire") ||
-    t.includes("off-hire") ||
-    t.includes("under charter") ||
-    t.includes("charterers' instructions") ||
-    t.includes("charterers instructions");
-
-  if (chartererSignals) {
-    add("Charterers’ Liability", 0.65, "Text indicates Nova is acting as charterer / under charterparty obligations (hire/off-hire/CP instructions).");
-  }
-
-  // If nothing detected, default to “To be confirmed”
-  if (covers.length === 0) {
-    add("To Be Confirmed", 0.30, "Insufficient information in first notification to classify confidently.");
-  }
-
-  // De-dupe by type, keep highest confidence
-  const best = new Map();
-  for (const c of covers) {
-    if (!best.has(c.type) || best.get(c.type).confidence < c.confidence) best.set(c.type, c);
-  }
-
-  return { covers: Array.from(best.values()).sort((a, b) => b.confidence - a.confidence) };
+  if (!Array.isArray(claim.actions)) claim.actions = [];
+  if (!Array.isArray(claim.files)) claim.files = [];
+  if (!Array.isArray(claim.statusLog)) claim.statusLog = [];
+  if (!Array.isArray(claim.auditTrail)) claim.auditTrail = [];
+  if (!claim.classification) claim.classification = { covers: [] };
+  if (!claim.extraction) claim.extraction = {};
+  if (!claim.progressStatus) claim.progressStatus = "Notification Received";
+  return claim;
 }
 
-// -------------------------
-// 3) DEFAULT ACTIONS
-// -------------------------
-function buildDefaultActions(claimId, nowIso) {
-  const now = new Date(nowIso);
-  const addDays = (d) => new Date(now.getTime() + d * 86400000).toISOString();
-
-  const mk = (suffix, title, ownerRole, dueAt) => ({
-    id: `${claimId}-${suffix}`,
-    title,
-    ownerRole,
-    dueAt,
-    status: "OPEN",
-    createdAt: nowIso,
-    updatedAt: nowIso,
-    reminderAt: null,
-    notes: "",
-  });
-
-  return [
-    mk("A1", "Create claim file and preserve evidence", "Claims", nowIso),
-    mk("A2", "Confirm cover(s) and notify relevant insurers/club", "Claims", nowIso),
-    mk("A3", "Collect supporting documents (logs, photos, reports)", "Ops", addDays(1)),
-    mk("A4", "Appoint / confirm surveyor (if required)", "Claims", addDays(1)),
-    mk("A5", "Establish initial reserve (estimate) and deductible impact", "Finance", addDays(2)),
-    mk("A6", "Track updates and maintain status log", "Claims", nowIso),
-    mk("A7", "Identify third-party involvement and liability exposure", "Claims", addDays(1)),
-    mk("A8", "Obtain statements (Master/crew) and incident report", "Ops", addDays(1)),
-    mk("A9", "Confirm reporting requirements / next steps with insurers", "Claims", addDays(2)),
-  ];
+function addAudit(claim, by, action, note) {
+  if (!Array.isArray(claim.auditTrail)) claim.auditTrail = [];
+  claim.auditTrail.push({ at: nowIso(), by: by || "System", action, note: note || "" });
 }
 
-// -------------------------
-// 4) DRAFT TEMPLATES (templates only, no AI yet)
-// -------------------------
-function buildDraftTemplates(claim) {
-  const claimNumber = claim.claimNumber;
-  const vessel = claim.extraction?.vesselName || "Vessel (TBC)";
-  const imo = claim.extraction?.imo ? ` (IMO ${claim.extraction.imo})` : "";
-  const date = claim.extraction?.eventDateText || "Date (TBC)";
-  const loc = claim.extraction?.locationText || "Location (TBC)";
-  const raw = claim.extraction?.rawText || "";
+/** -------------------------
+ *  Core service functions
+ *  ------------------------- */
 
-  return [
-    {
-      type: "P&I_NOTIFICATION",
-      subject: `[${claimNumber}] - ${vessel} - P&I Notification (Initial)`,
-      body:
-`Dear P&I Club / Correspondents,
-
-We hereby give initial notification of an incident that may give rise to liabilities and/or costs falling within P&I cover.
-
-Claim Ref: ${claimNumber}
-Vessel: ${vessel}${imo}
-Date/Time (as advised): ${date}
-Location/Position: ${loc}
-
-Initial description (as received):
-${raw}
-
-Immediate actions taken / proposed:
-- Evidence preservation initiated (photos, statements, log extracts)
-- Request guidance on next steps and appointment of surveyor (if required)
-
-Kindly acknowledge receipt and advise recommended course of action.
-
-Best regards,
-Nova Carriers
-(Claims Team)`
-    },
-    {
-      type: "SURVEYOR_APPOINTMENT",
-      subject: `[${claimNumber}] - ${vessel} - Survey Appointment Request`,
-      body:
-`Dear Sir/Madam,
-
-Nova Carriers requests your attendance / appointment as surveyor in relation to the below incident.
-
-Claim Ref: ${claimNumber}
-Vessel: ${vessel}${imo}
-Incident date: ${date}
-Location: ${loc}
-
-Please confirm:
-1) Earliest attendance and ETA
-2) Information/documents required prior attendance
-3) Expected deliverables and timeline for preliminary and final report
-
-Best regards,
-Nova Carriers
-(Claims Team)`
-    },
-    {
-      type: "CHASE_REMINDER",
-      subject: `[${claimNumber}] - ${vessel} - Follow-up / Chase`,
-      body:
-`Dear All,
-
-Gentle reminder / follow-up in relation to Claim Ref ${claimNumber} (${vessel}).
-
-Please provide an update and expected timeline for outstanding items.
-
-Best regards,
-Nova Carriers
-(Claims Team)`
-    }
-  ];
-}
-
-// -------------------------
-// 5) CRUD + PATCHES
-// -------------------------
 function listClaims() {
   const db = ensureDBShape(loadDB());
-  return db.claims
+  const claims = (db.claims || []).map(ensureClaimShape);
+
+  return claims
     .slice()
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((c) => ({
-      id: c.id,
-      claimNumber: c.claimNumber,
-      vesselName: c.extraction?.vesselName || null,
-      eventDateText: c.extraction?.eventDateText || null,
-      locationText: c.extraction?.locationText || null,
-      progressStatus: c.progressStatus,
-      covers: (c.classification?.covers || []).map((x) => x.type),
-      reserveEstimated: Number(c.finance?.reserveEstimated || 0),
-      paid: Number(c.finance?.paid || 0),
-      deductible: Number(c.finance?.deductible || 0),
-      recoverable: Number(c.finance?.recoverable || 0),
-      outstanding: Number(c.finance?.outstanding || 0),
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-    }));
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((c) => {
+      const f = c.finance || normalizeFinance({}, {});
+      return {
+        id: c.id,
+        claimNumber: c.claimNumber,
+        vesselName: c.extraction?.vesselName || c.vesselName || null,
+        eventDateText: c.extraction?.eventDateText || c.eventDateText || null,
+        locationText: c.extraction?.locationText || c.locationText || null,
+        progressStatus: c.progressStatus,
+        covers: (c.classification?.covers || []).map((x) => x.type),
+        currency: f.currency || "USD",
+        reserveEstimated: f.reserveEstimated || 0,
+        cashOut: f.cashOut || 0,
+        deductible: f.deductible || 0,
+        recoverableExpected: f.recoverableExpected || 0,
+        recovered: f.recovered || 0,
+        outstandingRecovery: f.outstandingRecovery || 0,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      };
+    });
 }
 
 function getClaim(id) {
   const db = ensureDBShape(loadDB());
-  return db.claims.find((c) => c.id === id) || null;
+  const claim = (db.claims || []).find((c) => c.id === id);
+  if (!claim) return null;
+  return ensureClaimShape(claim);
 }
 
-function createClaim({ createdBy, firstNotificationText }) {
+function createClaim({ createdBy, company, firstNotificationText }) {
   const db = ensureDBShape(loadDB());
-  const now = new Date().toISOString();
-
-  const extraction = extractFirstNotification(firstNotificationText);
-  const classification = classifyFromExtraction(extraction);
-
   const year = new Date().getFullYear();
   const seq = nextClaimSequenceForYear(db, year);
   const claimNumber = `MC-NOVA-${year}-${String(seq).padStart(4, "0")}`;
 
-  const id = uuidv4();
-  const actions = buildDefaultActions(id, now);
+  const createdAt = nowIso();
 
-  const claim = {
-    id,
+  // AI-ish extraction/classification (current util version)
+  const extraction = extractFromFirstNotification(firstNotificationText || "");
+  const classification = classifyFromExtraction(extraction, firstNotificationText || "");
+
+  const claim = ensureClaimShape({
+    id: uuidv4(),
     claimNumber,
-    company: "Nova Carriers",
-    createdAt: now,
-    updatedAt: now,
+    company: company || "Nova Carriers",
+    createdAt,
+    updatedAt: createdAt,
     createdBy: createdBy || "Unknown",
     progressStatus: "Notification Received",
-    extraction,
-    classification,
-    actions,
-    finance: {
-      currency: "USD",
-      reserveEstimated: 0,
-      paid: 0,
-      deductible: 0,
-      recoverable: 0,
-      outstanding: 0,
-      notes: "",
+
+    extraction: {
+      rawText: firstNotificationText || "",
+      summary: extraction.summary || firstNotificationText || "",
+      vesselName: extraction.vesselName || null,
+      imo: extraction.imo || null,
+      eventDateText: extraction.eventDateText || null,
+      locationText: extraction.locationText || null,
+      incidentKeywords: extraction.incidentKeywords || [],
+      counterpartyText: extraction.counterpartyText || null,
     },
+
+    classification,
+    actions: defaultActionsForClassification(classification),
     files: [],
     statusLog: [
-      { at: now, by: createdBy || "Unknown", status: "Notification Received", note: "Claim created from first notification." }
+      {
+        at: createdAt,
+        by: createdBy || "Unknown",
+        status: "Notification Received",
+        note: "Claim created from first notification.",
+      },
     ],
-    auditTrail: [
-      { at: now, by: createdBy || "Unknown", action: "CLAIM_CREATED", note: "Claim created from first notification." }
-    ],
-  };
+    auditTrail: [],
+    finance: normalizeFinance({}, {}),
+  });
 
+  addAudit(claim, createdBy, "CLAIM_CREATED", `Created claim ${claimNumber}`);
   db.claims.push(claim);
   saveDB(db);
   return claim;
 }
 
-function updateProgressStatus(id, { by, progressStatus }) {
+function patchProgress({ id, by, progressStatus }) {
   const db = ensureDBShape(loadDB());
-  const claim = db.claims.find((c) => c.id === id);
+  const claim = (db.claims || []).find((c) => c.id === id);
   if (!claim) return null;
 
-  const now = new Date().toISOString();
-  claim.progressStatus = progressStatus;
-  claim.updatedAt = now;
+  ensureClaimShape(claim);
 
-  claim.statusLog = claim.statusLog || [];
-  claim.auditTrail = claim.auditTrail || [];
+  claim.progressStatus = progressStatus || claim.progressStatus;
+  claim.updatedAt = nowIso();
 
-  claim.statusLog.push({ at: now, by, status: progressStatus, note: "Progress updated" });
-  claim.auditTrail.push({ at: now, by, action: "STATUS_UPDATED", note: `Progress set to: ${progressStatus}` });
+  claim.statusLog.push({
+    at: claim.updatedAt,
+    by: by || "Unknown",
+    status: claim.progressStatus,
+    note: "Progress updated",
+  });
 
+  addAudit(claim, by, "STATUS_UPDATED", `Progress set to: ${claim.progressStatus}`);
   saveDB(db);
   return claim;
 }
 
-function updateAction(id, actionId, { by, status, notes, reminderAt }) {
+function patchFinance({ id, by, finance }) {
   const db = ensureDBShape(loadDB());
-  const claim = db.claims.find((c) => c.id === id);
+  const claim = (db.claims || []).find((c) => c.id === id);
   if (!claim) return null;
 
-  const action = (claim.actions || []).find((a) => a.id === actionId);
-  if (!action) return null;
+  ensureClaimShape(claim);
 
-  const now = new Date().toISOString();
-  claim.updatedAt = now;
+  const prev = claim.finance || normalizeFinance({}, {});
+  claim.finance = normalizeFinance(finance || {}, prev);
+  claim.updatedAt = nowIso();
 
-  if (status) action.status = status;
-  if (typeof notes === "string") action.notes = notes;
-  if (typeof reminderAt !== "undefined") action.reminderAt = reminderAt;
-
-  action.updatedAt = now;
-
-  claim.auditTrail = claim.auditTrail || [];
-  claim.auditTrail.push({
-    at: now,
+  addAudit(
+    claim,
     by,
-    action: "ACTION_UPDATED",
-    note: `Action updated: ${action.title} (status=${action.status})`,
-  });
-
-  saveDB(db);
-  return action;
-}
-
-// ✅ Finance update (Fix #2)
-function updateFinance(id, finance, by) {
-  const db = ensureDBShape(loadDB());
-  const claim = db.claims.find((c) => c.id === id);
-  if (!claim) return null;
-
-  const now = new Date().toISOString();
-  claim.updatedAt = now;
-
-  claim.finance = claim.finance || {};
-  claim.auditTrail = claim.auditTrail || [];
-
-  const reserve = Number(finance.reserveEstimated ?? claim.finance.reserveEstimated ?? 0);
-  const paid = Number(finance.paid ?? claim.finance.paid ?? 0);
-  const deductible = Number(finance.deductible ?? claim.finance.deductible ?? 0);
-
-  const recoverable = Math.max(0, paid - deductible);
-  const outstanding = Math.max(0, reserve - paid);
-
-  claim.finance = {
-    currency: finance.currency || claim.finance.currency || "USD",
-    reserveEstimated: reserve,
-    paid,
-    deductible,
-    recoverable,
-    outstanding,
-    notes: finance.notes ?? claim.finance.notes ?? "",
-  };
-
-  claim.auditTrail.push({
-    at: now,
-    by,
-    action: "FINANCE_UPDATED",
-    note: `Finance updated (reserve=${reserve}, paid=${paid}, deductible=${deductible}, recoverable=${recoverable}, outstanding=${outstanding})`,
-  });
+    "FINANCE_UPDATED",
+    `Finance updated (reserve=${claim.finance.reserveEstimated}, cashOut=${claim.finance.cashOut}, recovered=${claim.finance.recovered}, outstandingRecovery=${claim.finance.outstandingRecovery})`
+  );
 
   saveDB(db);
   return claim.finance;
 }
 
+function patchAction({ id, actionId, by, status, notes, reminderAt }) {
+  const db = ensureDBShape(loadDB());
+  const claim = (db.claims || []).find((c) => c.id === id);
+  if (!claim) return null;
+
+  ensureClaimShape(claim);
+
+  const a = (claim.actions || []).find((x) => x.id === actionId);
+  if (!a) return null;
+
+  if (status !== undefined) a.status = status;
+  if (notes !== undefined) a.notes = String(notes || "");
+  if (reminderAt !== undefined) a.reminderAt = reminderAt; // ISO string or null
+
+  a.updatedAt = nowIso();
+  claim.updatedAt = a.updatedAt;
+
+  addAudit(claim, by, "ACTION_UPDATED", `Action updated: ${a.title} (status=${a.status})`);
+  saveDB(db);
+  return a;
+}
+
 function getDrafts(id) {
   const claim = getClaim(id);
   if (!claim) return null;
-  return buildDraftTemplates(claim);
+  return generateDrafts(claim);
 }
 
 function getDueReminders() {
   const db = ensureDBShape(loadDB());
-  const now = new Date();
-  const due = [];
+  const claims = (db.claims || []).map(ensureClaimShape);
+  const now = Date.now();
 
-  for (const c of db.claims) {
+  const out = [];
+
+  for (const c of claims) {
     for (const a of c.actions || []) {
       if (!a.reminderAt) continue;
-      const r = new Date(a.reminderAt);
-      if (isNaN(r.getTime())) continue;
-      if (r <= now && a.status !== "DONE") {
-        due.push({
+      const t = new Date(a.reminderAt).getTime();
+      if (Number.isNaN(t)) continue;
+      if (t <= now && a.status !== "DONE") {
+        out.push({
           claimId: c.id,
           claimNumber: c.claimNumber,
-          vesselName: c.extraction?.vesselName || null,
+          vesselName: c.extraction?.vesselName || c.vesselName || null,
           progressStatus: c.progressStatus,
           coverTypes: (c.classification?.covers || []).map((x) => x.type),
           actionId: a.id,
@@ -440,17 +331,17 @@ function getDueReminders() {
     }
   }
 
-  due.sort((x, y) => new Date(x.reminderAt) - new Date(y.reminderAt));
-  return due;
+  out.sort((a, b) => new Date(a.reminderAt).getTime() - new Date(b.reminderAt).getTime());
+  return out;
 }
 
 module.exports = {
   listClaims,
   getClaim,
   createClaim,
-  updateProgressStatus,
-  updateFinance,
-  updateAction,
+  patchProgress,
+  patchFinance,
+  patchAction,
   getDrafts,
   getDueReminders,
 };

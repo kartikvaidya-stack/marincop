@@ -1,381 +1,441 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import React, { use, useEffect, useMemo, useState } from "react";
+import styles from "./detail.module.css";
 
-const money = (n) => {
+function money(n) {
   const x = Number(n || 0);
+  if (!Number.isFinite(x)) return "0";
   return x.toLocaleString(undefined, { maximumFractionDigits: 0 });
-};
+}
 
-const isoLocal = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (v) => String(v).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
-};
+const STATUS_OPTIONS = [
+  "Notification Received",
+  "Insurers Notified",
+  "Survey Appointed",
+  "Under Review",
+  "Settlement Agreed",
+  "Paid",
+  "Recovery Ongoing",
+  "Closed",
+];
 
-const fromLocalToIso = (local) => {
-  if (!local) return null;
-  const d = new Date(local);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
-};
-
-export default function ClaimDetailPage() {
-  const params = useParams();
-  const claimId = params?.id;
+export default function ClaimDetailPage({ params }) {
+  // ✅ Next.js 16: params may be a Promise in some runtimes
+  const resolvedParams = typeof params?.then === "function" ? use(params) : params;
+  const claimId = resolvedParams?.id;
 
   const [claim, setClaim] = useState(null);
-  const [drafts, setDrafts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const apiBase = "/api"; // frontend proxy routes
+  // Status update
+  const [status, setStatus] = useState("Notification Received");
+  const [statusBy, setStatusBy] = useState("Kartik");
+  const [statusSaving, setStatusSaving] = useState(false);
 
-  // Finance form
-  const [by, setBy] = useState("Kartik");
+  // Finance
+  const [financeBy, setFinanceBy] = useState("Kartik");
   const [currency, setCurrency] = useState("USD");
-  const [reserveEstimated, setReserveEstimated] = useState("");
-  const [paid, setPaid] = useState("");
-  const [deductible, setDeductible] = useState("");
-  const [notes, setNotes] = useState("");
-  const [savingFinance, setSavingFinance] = useState(false);
-  const [financeMsg, setFinanceMsg] = useState("");
+  const [reserveEstimated, setReserveEstimated] = useState(0);
+  const [cashOut, setCashOut] = useState(0); // Owner cash out (paid)
+  const [deductible, setDeductible] = useState(0);
+  const [recovered, setRecovered] = useState(0);
+  const [financeNotes, setFinanceNotes] = useState("");
+  const [financeSaving, setFinanceSaving] = useState(false);
 
-  async function load() {
-    if (!claimId) {
-      setErr("Missing claim id.");
-      setLoading(false);
-      return;
-    }
+  // Actions
+  const [actionSavingId, setActionSavingId] = useState("");
+  const [actionReminder, setActionReminder] = useState({}); // { actionId: "YYYY-MM-DDTHH:mm" }
 
-    setLoading(true);
-    setErr("");
+  // Drafts
+  const [drafts, setDrafts] = useState([]);
+  const [draftErr, setDraftErr] = useState("");
 
+  const recoverableExpected = useMemo(
+    () => Math.max(0, Number(cashOut || 0) - Number(deductible || 0)),
+    [cashOut, deductible]
+  );
+  const outstandingRecovery = useMemo(
+    () => Math.max(0, Number(recoverableExpected || 0) - Number(recovered || 0)),
+    [recoverableExpected, recovered]
+  );
+
+  async function loadAll() {
     try {
-      const res = await fetch(`${apiBase}/claims/${claimId}`, { cache: "no-store" });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.message || `Claim load failed (HTTP ${res.status})`);
+      setLoading(true);
+      setErr("");
+      setDraftErr("");
 
-      setClaim(json.data);
+      // Claim
+      const res = await fetch(`/api/claims/${claimId}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.message || `Claim load failed (HTTP ${res.status})`);
+      }
 
-      const f = json.data.finance || {};
+      const c = json.data;
+      setClaim(c);
+
+      // Status
+      setStatus(c.progressStatus || "Notification Received");
+
+      // Finance (support both "paid" and "cashOut")
+      const f = c.finance || {};
       setCurrency(f.currency || "USD");
-      setReserveEstimated(f.reserveEstimated ?? f.reserveEstimated === 0 ? String(f.reserveEstimated) : "");
-      setPaid(f.paid ?? f.paid === 0 ? String(f.paid) : "");
-      setDeductible(f.deductible ?? f.deductible === 0 ? String(f.deductible) : "");
-      setNotes(f.notes || "");
+      setReserveEstimated(Number(f.reserveEstimated || 0));
+      setCashOut(Number(f.cashOut ?? f.paid ?? 0));
+      setDeductible(Number(f.deductible || 0));
+      setRecovered(Number(f.recovered || 0));
+      setFinanceNotes(String(f.notes || ""));
 
-      // drafts
-      const dr = await fetch(`${apiBase}/claims/${claimId}/drafts`, { cache: "no-store" });
-      const dj = await dr.json().catch(() => ({}));
-      if (dr.ok && dj.ok) setDrafts(dj.data || []);
-      else setDrafts([]);
+      // Drafts
+      const dRes = await fetch(`/api/claims/${claimId}/drafts`, { cache: "no-store" });
+      const dJson = await dRes.json();
+      if (dRes.ok && dJson.ok) setDrafts(dJson.data || []);
+      else setDraftErr(dJson.message || `Drafts failed (HTTP ${dRes.status})`);
     } catch (e) {
-      setErr(e.message || "Failed to load");
+      setErr(e?.message || "Failed to load claim");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    load();
+    if (!claimId) return;
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId]);
 
-  const computed = useMemo(() => {
-    const r = Number(reserveEstimated || 0);
-    const p = Number(paid || 0);
-    const d = Number(deductible || 0);
-    const recoverable = Math.max(0, p - d);
-    const outstanding = Math.max(0, r - p);
-    return { r, p, d, recoverable, outstanding };
-  }, [reserveEstimated, paid, deductible]);
+  async function saveStatus() {
+    try {
+      setStatusSaving(true);
+      setErr("");
+
+      const res = await fetch(`/api/claims/${claimId}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ by: statusBy, progressStatus: status }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.message || "Failed to update status");
+      await loadAll();
+    } catch (e) {
+      setErr(e?.message || "Failed to update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
 
   async function saveFinance() {
-    if (!claimId) return;
-    setSavingFinance(true);
-    setFinanceMsg("");
-
     try {
-      const res = await fetch(`${apiBase}/claims/${claimId}/finance`, {
+      setFinanceSaving(true);
+      setErr("");
+
+      const res = await fetch(`/api/claims/${claimId}/finance`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          by,
+          by: financeBy,
           finance: {
             currency,
             reserveEstimated: Number(reserveEstimated || 0),
-            paid: Number(paid || 0),
+            cashOut: Number(cashOut || 0),
+            paid: Number(cashOut || 0), // backward compatible
             deductible: Number(deductible || 0),
-            notes,
+            recovered: Number(recovered || 0),
+            notes: financeNotes,
           },
         }),
       });
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.message || `Save failed (HTTP ${res.status})`);
-
-      setFinanceMsg("Saved ✅");
-      await load();
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.message || "Failed to save finance");
+      await loadAll();
     } catch (e) {
-      setFinanceMsg(`Save failed: ${e.message}`);
+      setErr(e?.message || "Failed to save finance");
     } finally {
-      setSavingFinance(false);
+      setFinanceSaving(false);
     }
   }
 
-  async function toggleAction(actionId, nextStatus) {
-    if (!claimId) return;
+  async function patchAction(actionId, patch) {
     try {
-      const res = await fetch(`${apiBase}/claims/${claimId}/actions/${actionId}`, {
+      setActionSavingId(actionId);
+      setErr("");
+
+      const res = await fetch(`/api/claims/${claimId}/actions/${actionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          by,
-          status: nextStatus,
-        }),
+        body: JSON.stringify({ by: "Kartik", ...patch }),
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.message || `Action update failed (HTTP ${res.status})`);
-      await load();
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.message || "Failed to update action");
+      await loadAll();
     } catch (e) {
-      alert(e.message || "Action update failed");
+      setErr(e?.message || "Failed to update action");
+    } finally {
+      setActionSavingId("");
     }
   }
 
-  async function saveReminder(actionId, reminderLocal) {
-    if (!claimId) return;
-    const reminderAt = fromLocalToIso(reminderLocal);
-    try {
-      const res = await fetch(`${apiBase}/claims/${claimId}/actions/${actionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          by,
-          reminderAt,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) throw new Error(json.message || `Reminder save failed (HTTP ${res.status})`);
-      await load();
-    } catch (e) {
-      alert(e.message || "Reminder save failed");
-    }
+  if (!claimId) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <Link className={styles.back} href="/">← Back to claims</Link>
+          <div className={styles.error}>Error: Missing claim id.</div>
+        </div>
+      </div>
+    );
   }
-
-  const copy = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text || "");
-      alert("Copied ✅");
-    } catch {
-      alert("Copy failed (browser blocked clipboard)");
-    }
-  };
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <Link href="/" style={styles.back}>← Back to claims</Link>
-        <div style={styles.card}>Loading…</div>
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <Link className={styles.back} href="/">← Back to claims</Link>
+          <div>Loading…</div>
+        </div>
       </div>
     );
   }
 
   if (err) {
     return (
-      <div style={styles.page}>
-        <Link href="/" style={styles.back}>← Back to claims</Link>
-        <div style={styles.card}>Error: {err}</div>
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <Link className={styles.back} href="/">← Back to claims</Link>
+          <div className={styles.error}>Error: {err}</div>
+        </div>
       </div>
     );
   }
 
-  const covers = (claim?.classification?.covers || []).map((c) => c.type).join(", ") || "—";
-  const vessel = claim?.extraction?.vesselName || "—";
+  const vessel = claim?.extraction?.vesselName || claim?.vesselName || "—";
+  const covers =
+    (claim?.classification?.covers || []).map((x) => x.type).join(", ") ||
+    (claim?.covers || []).join(", ") ||
+    "—";
+
+  const statusLog = Array.isArray(claim?.statusLog) ? claim.statusLog : [];
 
   return (
-    <div style={styles.page}>
-      <Link href="/" style={styles.back}>← Back to claims</Link>
+    <div className={styles.page}>
+      <div className={styles.card}>
+        <Link className={styles.back} href="/">← Back to claims</Link>
 
-      <div style={styles.headerRow}>
-        <div>
-          <div style={styles.h1}>{claim.claimNumber}</div>
-          <div style={styles.sub}>Vessel: <b>{vessel}</b> • Covers: {covers}</div>
-          <div style={styles.sub2}>Status: <b>{claim.progressStatus}</b></div>
+        <div className={styles.top}>
+          <div>
+            <div className={styles.title}>{claim.claimNumber}</div>
+            <div className={styles.sub}>Vessel: {vessel} • Covers: {covers}</div>
+          </div>
+          <button className={styles.btn} onClick={loadAll}>Refresh</button>
         </div>
-        <button style={styles.refreshBtn} onClick={load}>Refresh</button>
-      </div>
 
-      <div style={styles.grid2}>
-        {/* Finance */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Finance</div>
-          <div style={styles.small}>Reserve can remain. Paid is gross. Recoverable = Paid − Deductible.</div>
+        <div className={styles.grid}>
+          {/* Status + timeline */}
+          <section className={styles.panel}>
+            <div className={styles.panelTitle}>Status</div>
 
-          <div style={styles.formGrid}>
-            <label style={styles.label}>By</label>
-            <input style={styles.input} value={by} onChange={(e) => setBy(e.target.value)} />
-
-            <label style={styles.label}>Currency</label>
-            <input style={styles.input} value={currency} onChange={(e) => setCurrency(e.target.value)} />
-
-            <label style={styles.label}>Reserve (Estimated)</label>
-            <input style={styles.input} value={reserveEstimated} onChange={(e) => setReserveEstimated(e.target.value)} placeholder="e.g. 50000" />
-
-            <label style={styles.label}>Paid (Gross)</label>
-            <input style={styles.input} value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="e.g. 12000" />
-
-            <label style={styles.label}>Deductible</label>
-            <input style={styles.input} value={deductible} onChange={(e) => setDeductible(e.target.value)} placeholder="e.g. 25000" />
-          </div>
-
-          <div style={styles.kpiRow}>
-            <div style={styles.kpiBox}>
-              <div style={styles.kpiLabel}>Recoverable</div>
-              <div style={styles.kpiValue}>{money(computed.recoverable)}</div>
+            <div className={styles.row}>
+              <div className={styles.label}>Current</div>
+              <div className={styles.value}>{claim.progressStatus || "—"}</div>
             </div>
-            <div style={styles.kpiBox}>
-              <div style={styles.kpiLabel}>Outstanding</div>
-              <div style={styles.kpiValue}>{money(computed.outstanding)}</div>
+
+            <div className={styles.row}>
+              <div className={styles.label}>Update to</div>
+              <select className={styles.input} value={status} onChange={(e) => setStatus(e.target.value)}>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          <label style={styles.label}>Notes</label>
-          <textarea style={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <div className={styles.row}>
+              <div className={styles.label}>By</div>
+              <input className={styles.input} value={statusBy} onChange={(e) => setStatusBy(e.target.value)} />
+            </div>
 
-          <div style={styles.rowBetween}>
-            <button style={styles.primaryBtn} onClick={saveFinance} disabled={savingFinance}>
-              {savingFinance ? "Saving…" : "Save Finance"}
+            <button className={styles.btnPrimary} onClick={saveStatus} disabled={statusSaving}>
+              {statusSaving ? "Saving…" : "Save status"}
             </button>
-            <div style={styles.msg}>{financeMsg}</div>
-          </div>
-        </div>
 
-        {/* Drafts */}
-        <div style={styles.card}>
-          <div style={styles.cardTitle}>Draft templates</div>
-          <div style={styles.small}>Templates only (AI drafting comes later). Click Copy.</div>
+            <div className={styles.divider} />
 
-          {drafts.length === 0 ? (
-            <div style={styles.small}>No drafts found.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              {drafts.map((d, idx) => (
-                <div key={`${d.type}-${idx}`} style={styles.draftBox}>
-                  <div style={styles.draftHead}>
-                    <div>
-                      <div style={styles.draftType}>{d.type}</div>
-                      <div style={styles.draftSubj}>{d.subject}</div>
+            <div className={styles.panelTitleSmall}>Timeline</div>
+
+            {statusLog.length === 0 ? (
+              <div className={styles.muted}>No status history yet.</div>
+            ) : (
+              <div className={styles.timeline}>
+                {statusLog
+                  .slice()
+                  .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                  .map((e, idx) => (
+                    <div className={styles.timelineRow} key={idx}>
+                      <div className={styles.timelineDot} />
+                      <div className={styles.timelineContent}>
+                        <div className={styles.timelineTop}>
+                          <div className={styles.timelineStatus}>{e.status}</div>
+                          <div className={styles.timelineAt}>{new Date(e.at).toLocaleString()}</div>
+                        </div>
+                        <div className={styles.timelineMeta}>
+                          by <b>{e.by || "—"}</b>
+                        </div>
+                        {e.note ? <div className={styles.timelineNote}>{e.note}</div> : null}
+                      </div>
                     </div>
-                    <button style={styles.copyBtn} onClick={() => copy(`Subject: ${d.subject}\n\n${d.body}`)}>
-                      Copy
-                    </button>
-                  </div>
-                  <pre style={styles.pre}>{d.body}</pre>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div style={styles.cardWide}>
-          <div style={styles.cardTitle}>Actions</div>
-          <div style={styles.small}>
-            Mark actions Open/DONE and set reminders. Reminders appear in the Reminders tab when due.
-          </div>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            {(claim.actions || []).map((a) => (
-              <div key={a.id} style={styles.actionRow}>
-                <div style={{ flex: 1 }}>
-                  <div style={styles.actionTitle}>{a.title}</div>
-                  <div style={styles.actionMeta}>
-                    Owner: {a.ownerRole} • Status: <b>{a.status}</b> • Due:{" "}
-                    {a.dueAt ? new Date(a.dueAt).toLocaleString() : "—"}
-                    {a.reminderAt ? ` • Reminder: ${new Date(a.reminderAt).toLocaleString()}` : ""}
-                  </div>
-
-                  <div style={styles.reminderRow}>
-                    <span style={styles.remLabel}>Set reminder:</span>
-                    <input
-                      type="datetime-local"
-                      style={styles.input}
-                      defaultValue={isoLocal(a.reminderAt)}
-                      onBlur={(e) => saveReminder(a.id, e.target.value)}
-                    />
-                    <span style={styles.remHint}>Click outside to save</span>
-                  </div>
-                </div>
-
-                <div style={styles.actionBtns}>
-                  {a.status !== "DONE" ? (
-                    <button style={styles.doneBtn} onClick={() => toggleAction(a.id, "DONE")}>Mark DONE</button>
-                  ) : (
-                    <button style={styles.openBtn} onClick={() => toggleAction(a.id, "OPEN")}>Reopen</button>
-                  )}
-                </div>
+                  ))}
               </div>
-            ))}
-          </div>
-        </div>
+            )}
+          </section>
 
+          {/* Finance */}
+          <section className={styles.panel}>
+            <div className={styles.panelTitle}>Finance (Owner view)</div>
+
+            <div className={styles.financeGrid}>
+              <label className={styles.field}>
+                <span>Currency</span>
+                <input className={styles.input} value={currency} onChange={(e) => setCurrency(e.target.value)} />
+              </label>
+
+              <label className={styles.field}>
+                <span>Reserve (insurer)</span>
+                <input className={styles.input} type="number" value={reserveEstimated} onChange={(e) => setReserveEstimated(e.target.value)} />
+              </label>
+
+              <label className={styles.field}>
+                <span>Cash Out (paid by owner)</span>
+                <input className={styles.input} type="number" value={cashOut} onChange={(e) => setCashOut(e.target.value)} />
+              </label>
+
+              <label className={styles.field}>
+                <span>Deductible</span>
+                <input className={styles.input} type="number" value={deductible} onChange={(e) => setDeductible(e.target.value)} />
+              </label>
+
+              <label className={styles.field}>
+                <span>Recovered</span>
+                <input className={styles.input} type="number" value={recovered} onChange={(e) => setRecovered(e.target.value)} />
+              </label>
+
+              <label className={styles.field}>
+                <span>Recoverable (Cash Out − Deductible)</span>
+                <input className={styles.input} value={money(recoverableExpected)} readOnly />
+              </label>
+
+              <label className={styles.field}>
+                <span>Outstanding Recovery</span>
+                <input className={styles.input} value={money(outstandingRecovery)} readOnly />
+              </label>
+
+              <label className={styles.field}>
+                <span>By</span>
+                <input className={styles.input} value={financeBy} onChange={(e) => setFinanceBy(e.target.value)} />
+              </label>
+            </div>
+
+            <label className={styles.fieldFull}>
+              <span>Notes</span>
+              <textarea className={styles.textarea} rows={3} value={financeNotes} onChange={(e) => setFinanceNotes(e.target.value)} />
+            </label>
+
+            <button className={styles.btnPrimary} onClick={saveFinance} disabled={financeSaving}>
+              {financeSaving ? "Saving…" : "Save finance"}
+            </button>
+          </section>
+
+          {/* Actions */}
+          <section className={styles.panelWide}>
+            <div className={styles.panelTitle}>Actions</div>
+
+            {(claim.actions || []).length === 0 ? (
+              <div className={styles.muted}>No actions.</div>
+            ) : (
+              <div className={styles.actionsList}>
+                {(claim.actions || []).map((a) => (
+                  <div className={styles.actionRow} key={a.id}>
+                    <div className={styles.actionMain}>
+                      <div className={styles.actionTitle}>{a.title}</div>
+                      <div className={styles.actionMeta}>
+                        Role: {a.ownerRole || "—"} • Due: {a.dueAt ? new Date(a.dueAt).toLocaleString() : "—"} • Status: <b>{a.status}</b>
+                      </div>
+                      {a.notes ? <div className={styles.actionNotes}>{a.notes}</div> : null}
+                      {a.reminderAt ? (
+                        <div className={styles.actionReminder}>
+                          Reminder: <b>{new Date(a.reminderAt).toLocaleString()}</b>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className={styles.actionControls}>
+                      <button
+                        className={styles.btn}
+                        disabled={actionSavingId === a.id}
+                        onClick={() => patchAction(a.id, { status: a.status === "DONE" ? "OPEN" : "DONE" })}
+                      >
+                        {a.status === "DONE" ? "Re-open" : "Mark DONE"}
+                      </button>
+
+                      <input
+                        className={styles.inputSmall}
+                        type="datetime-local"
+                        value={actionReminder[a.id] || ""}
+                        onChange={(e) => setActionReminder((p) => ({ ...p, [a.id]: e.target.value }))}
+                        title="Set reminder"
+                      />
+
+                      <button
+                        className={styles.btn}
+                        disabled={actionSavingId === a.id}
+                        onClick={() => {
+                          const v = actionReminder[a.id];
+                          if (!v) return;
+                          const iso = new Date(v).toISOString();
+                          patchAction(a.id, { reminderAt: iso });
+                        }}
+                      >
+                        Set reminder
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Drafts */}
+          <section className={styles.panelWide}>
+            <div className={styles.panelTitle}>Draft templates</div>
+
+            {draftErr ? <div className={styles.error}>Drafts: {draftErr}</div> : null}
+
+            {drafts.length === 0 ? (
+              <div className={styles.muted}>No drafts available.</div>
+            ) : (
+              <div className={styles.drafts}>
+                {drafts.map((d, idx) => (
+                  <div key={idx} className={styles.draftCard}>
+                    <div className={styles.draftHead}>
+                      <div className={styles.draftType}>{d.type}</div>
+                      <button
+                        className={styles.btn}
+                        onClick={() => navigator.clipboard.writeText(`Subject: ${d.subject}\n\n${d.body}`)}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <div className={styles.draftSubj}>{d.subject}</div>
+                    <pre className={styles.draftBody}>{d.body}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: { padding: 24, background: "#f6f8fb", minHeight: "100vh", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial" },
-  back: { display: "inline-block", marginBottom: 14, color: "#1f4b99", textDecoration: "none" },
-  headerRow: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  h1: { fontSize: 22, fontWeight: 750, color: "#0f172a" },
-  sub: { marginTop: 6, color: "#334155" },
-  sub2: { marginTop: 4, color: "#475569", fontSize: 13 },
-  refreshBtn: { border: "1px solid #cbd5e1", background: "#fff", padding: "10px 12px", borderRadius: 10, cursor: "pointer" },
-
-  grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
-  card: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, boxShadow: "0 1px 8px rgba(15,23,42,0.06)" },
-  cardWide: { gridColumn: "1 / span 2", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, boxShadow: "0 1px 8px rgba(15,23,42,0.06)" },
-
-  cardTitle: { fontWeight: 750, marginBottom: 6, color: "#0f172a" },
-  small: { fontSize: 12, color: "#64748b", marginBottom: 10 },
-
-  formGrid: { display: "grid", gridTemplateColumns: "140px 1fr", gap: 10, alignItems: "center" },
-  label: { fontSize: 12, color: "#475569" },
-  input: { border: "1px solid #cbd5e1", borderRadius: 10, padding: 10, outline: "none" },
-  textarea: { width: "100%", minHeight: 90, border: "1px solid #cbd5e1", borderRadius: 10, padding: 10, marginTop: 6, outline: "none" },
-
-  kpiRow: { display: "flex", gap: 10, marginTop: 12, marginBottom: 10 },
-  kpiBox: { flex: 1, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 10 },
-  kpiLabel: { fontSize: 12, color: "#64748b" },
-  kpiValue: { marginTop: 4, fontSize: 18, fontWeight: 800, color: "#0f172a" },
-
-  rowBetween: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
-  primaryBtn: { background: "#2563eb", color: "#fff", border: "none", padding: "10px 12px", borderRadius: 10, cursor: "pointer", fontWeight: 650 },
-  msg: { fontSize: 12, color: "#334155" },
-
-  draftBox: { border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#fbfdff" },
-  draftHead: { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 8 },
-  draftType: { fontWeight: 800, color: "#0f172a", fontSize: 12 },
-  draftSubj: { fontSize: 12, color: "#475569", marginTop: 4 },
-  copyBtn: { border: "1px solid #cbd5e1", background: "#fff", padding: "8px 10px", borderRadius: 10, cursor: "pointer" },
-  pre: { whiteSpace: "pre-wrap", margin: 0, fontSize: 12, color: "#0f172a", lineHeight: 1.35 },
-
-  actionRow: { display: "flex", gap: 12, padding: 10, border: "1px solid #e2e8f0", borderRadius: 12, background: "#fbfdff" },
-  actionTitle: { fontWeight: 650, color: "#0f172a" },
-  actionMeta: { marginTop: 4, fontSize: 12, color: "#64748b" },
-  actionBtns: { display: "flex", alignItems: "center" },
-  doneBtn: { background: "#16a34a", color: "#fff", border: "none", padding: "10px 12px", borderRadius: 10, cursor: "pointer", fontWeight: 650 },
-  openBtn: { background: "#0f172a", color: "#fff", border: "none", padding: "10px 12px", borderRadius: 10, cursor: "pointer", fontWeight: 650 },
-
-  reminderRow: { display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" },
-  remLabel: { fontSize: 12, color: "#334155" },
-  remHint: { fontSize: 12, color: "#64748b" },
-};

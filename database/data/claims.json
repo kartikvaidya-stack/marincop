@@ -4,9 +4,9 @@
     "claimNumber": "MC-NOVA-2026-0005",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T14:41:48.297Z",
-    "updatedAt": "2026-01-22T14:41:58.490Z",
+    "updatedAt": "2026-01-24T06:44:57.287Z",
     "createdBy": "Kartik",
-    "progressStatus": "Notification Received",
+    "progressStatus": "Insurers Notified",
     "extraction": {
       "rawText": "MV Stolt Green, Chartered vessel ran aground at balikpapan.",
       "summary": "MV Stolt Green, Chartered vessel ran aground at balikpapan.",
@@ -34,10 +34,10 @@
         "title": "Create claim file and preserve evidence",
         "ownerRole": "Claims",
         "dueAt": "2026-01-22T14:41:48.297Z",
-        "status": "OPEN",
+        "status": "DONE",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T06:31:44.108Z",
+        "reminderAt": "2026-01-24T06:31:00.000Z",
         "notes": ""
       },
       {
@@ -45,9 +45,9 @@
         "title": "Confirm cover(s) and notify relevant insurers/club",
         "ownerRole": "Claims",
         "dueAt": "2026-01-22T14:41:48.297Z",
-        "status": "OPEN",
+        "status": "DONE",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
+        "updatedAt": "2026-01-24T06:44:47.804Z",
         "reminderAt": null,
         "notes": ""
       },
@@ -58,8 +58,8 @@
         "dueAt": "2026-01-23T14:41:48.297Z",
         "status": "OPEN",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T06:44:57.287Z",
+        "reminderAt": "2026-01-29T06:44:00.000Z",
         "notes": ""
       },
       {
@@ -69,8 +69,8 @@
         "dueAt": "2026-01-23T14:41:48.297Z",
         "status": "OPEN",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T06:22:54.316Z",
+        "reminderAt": "2026-01-27T06:22:00.000Z",
         "notes": ""
       },
       {
@@ -80,8 +80,8 @@
         "dueAt": "2026-01-24T14:41:48.297Z",
         "status": "OPEN",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T06:23:07.231Z",
+        "reminderAt": "2026-01-28T06:23:00.000Z",
         "notes": ""
       },
       {
@@ -89,10 +89,10 @@
         "title": "Track updates and maintain status log",
         "ownerRole": "Claims",
         "dueAt": "2026-01-22T14:41:48.297Z",
-        "status": "OPEN",
+        "status": "DONE",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T05:21:11.253Z",
+        "reminderAt": "2026-01-27T05:21:00.000Z",
         "notes": ""
       },
       {
@@ -102,8 +102,8 @@
         "dueAt": "2026-01-23T14:41:48.297Z",
         "status": "OPEN",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T05:18:21.058Z",
+        "reminderAt": "2026-01-26T05:18:00.000Z",
         "notes": ""
       },
       {
@@ -131,11 +131,13 @@
     ],
     "finance": {
       "currency": "USD",
-      "reserveEstimated": 200000,
-      "deductible": 0,
-      "recovered": 0,
-      "outstanding": 200000,
-      "notes": ""
+      "reserveEstimated": 50000,
+      "cashOut": 45000,
+      "deductible": 25000,
+      "recoverableExpected": 20000,
+      "recovered": 2000,
+      "outstandingRecovery": 18000,
+      "notes": "Testing paid vs deductible logic"
     },
     "files": [],
     "statusLog": [
@@ -144,6 +146,12 @@
         "by": "Kartik",
         "status": "Notification Received",
         "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-24T06:12:52.276Z",
+        "by": "Rachel Tan",
+        "status": "Insurers Notified",
+        "note": "Progress updated"
       }
     ],
     "auditTrail": [
@@ -158,6 +166,96 @@
         "by": "Kartik",
         "action": "FINANCE_UPDATED",
         "note": "Finance updated (reserve=200000, recovered=0, outstanding=200000)"
+      },
+      {
+        "at": "2026-01-23T09:19:09.428Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=50000, paid=12000, deductible=25000, recoverable=0, outstanding=38000)"
+      },
+      {
+        "at": "2026-01-23T09:37:40.153Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=50000, paid=22000, deductible=25000, recoverable=0, outstanding=28000)"
+      },
+      {
+        "at": "2026-01-24T04:12:49.075Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=50000, cashOut=45000, recovered=2000, outstandingRecovery=18000)"
+      },
+      {
+        "at": "2026-01-24T05:18:21.058Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Identify third-party involvement and liability exposure (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T05:18:44.336Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Appoint / confirm surveyor (if required) (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T05:20:47.613Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Track updates and maintain status log (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T05:21:11.254Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Track updates and maintain status log (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T06:12:52.276Z",
+        "by": "Rachel Tan",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Insurers Notified"
+      },
+      {
+        "at": "2026-01-24T06:13:17.814Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Appoint / confirm surveyor (if required) (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T06:22:54.316Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Appoint / confirm surveyor (if required) (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T06:23:07.233Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Establish initial reserve (estimate) and deductible impact (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T06:31:14.993Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Create claim file and preserve evidence (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T06:31:44.108Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Create claim file and preserve evidence (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T06:44:47.805Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Confirm cover(s) and notify relevant insurers/club (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T06:44:57.287Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Collect supporting documents (log extracts, photos, reports) (status=OPEN)"
       }
     ]
   },
@@ -166,7 +264,7 @@
     "claimNumber": "MC-NOVA-2026-0004",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T14:37:15.954Z",
-    "updatedAt": "2026-01-22T14:37:15.954Z",
+    "updatedAt": "2026-01-24T04:16:10.817Z",
     "createdBy": "Kartik",
     "progressStatus": "Notification Received",
     "extraction": {
@@ -301,10 +399,12 @@
     ],
     "finance": {
       "currency": "USD",
-      "reserveEstimated": 0,
-      "deductible": 0,
-      "recovered": 0,
-      "outstanding": 0,
+      "reserveEstimated": 30000,
+      "cashOut": 30000,
+      "deductible": 15000,
+      "recoverableExpected": 15000,
+      "recovered": 5000,
+      "outstandingRecovery": 10000,
       "notes": ""
     },
     "files": [],
@@ -322,6 +422,12 @@
         "by": "Kartik",
         "action": "CLAIM_CREATED",
         "note": "Created claim from first notification"
+      },
+      {
+        "at": "2026-01-24T04:16:10.817Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=30000, cashOut=30000, recovered=5000, outstandingRecovery=10000)"
       }
     ]
   },
@@ -330,9 +436,9 @@
     "claimNumber": "MC-NOVA-2026-0003",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T13:56:20.487Z",
-    "updatedAt": "2026-01-22T14:36:23.507Z",
+    "updatedAt": "2026-01-24T06:19:34.416Z",
     "createdBy": "Kartik",
-    "progressStatus": "Notification Received",
+    "progressStatus": "Closed",
     "extraction": {
       "rawText": "Nanjing Express\nFire in Cargo Hold\n15 jan 2025\nlocation- Rizhao.",
       "summary": "Nanjing Express\nFire in Cargo Hold\n15 jan 2025\nlocation- Rizhao.",
@@ -471,10 +577,12 @@
     ],
     "finance": {
       "currency": "USD",
-      "reserveEstimated": 44444,
+      "reserveEstimated": 0,
+      "cashOut": 0,
       "deductible": 0,
+      "recoverableExpected": 0,
       "recovered": 0,
-      "outstanding": 44444,
+      "outstandingRecovery": 0,
       "notes": ""
     },
     "files": [],
@@ -484,6 +592,12 @@
         "by": "Kartik",
         "status": "Notification Received",
         "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-24T06:19:34.416Z",
+        "by": "Kartik",
+        "status": "Closed",
+        "note": "Progress updated"
       }
     ],
     "auditTrail": [
@@ -498,6 +612,18 @@
         "by": "Kartik",
         "action": "FINANCE_UPDATED",
         "note": "Finance updated (reserve=44444, recovered=0, outstanding=44444)"
+      },
+      {
+        "at": "2026-01-24T06:19:25.044Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=0, cashOut=0, recovered=0, outstandingRecovery=0)"
+      },
+      {
+        "at": "2026-01-24T06:19:34.418Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Closed"
       }
     ]
   },
@@ -506,9 +632,9 @@
     "claimNumber": "MC-NOVA-2026-0002",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T13:52:29.412Z",
-    "updatedAt": "2026-01-22T13:52:29.412Z",
+    "updatedAt": "2026-01-24T06:19:43.791Z",
     "createdBy": "Kartik",
-    "progressStatus": "Notification Received",
+    "progressStatus": "Closed",
     "extraction": {
       "rawText": "Kalinmantan Express\nSingapore anchorage. \nFire in Cargo Hold.",
       "summary": "Kalinmantan Express\nSingapore anchorage. \nFire in Cargo Hold.",
@@ -648,9 +774,11 @@
     "finance": {
       "currency": "USD",
       "reserveEstimated": 0,
+      "cashOut": 0,
       "deductible": 0,
+      "recoverableExpected": 0,
       "recovered": 0,
-      "outstanding": 0,
+      "outstandingRecovery": 0,
       "notes": ""
     },
     "files": [],
@@ -660,6 +788,12 @@
         "by": "Kartik",
         "status": "Notification Received",
         "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-24T06:19:43.791Z",
+        "by": "Kartik",
+        "status": "Closed",
+        "note": "Progress updated"
       }
     ],
     "auditTrail": [
@@ -668,6 +802,12 @@
         "by": "Kartik",
         "action": "CLAIM_CREATED",
         "note": "Created claim from first notification"
+      },
+      {
+        "at": "2026-01-24T06:19:43.791Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Closed"
       }
     ]
   },
@@ -676,9 +816,9 @@
     "claimNumber": "MC-NOVA-2026-0001",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T13:52:02.906Z",
-    "updatedAt": "2026-01-22T13:52:02.906Z",
+    "updatedAt": "2026-01-24T06:20:02.292Z",
     "createdBy": "Kartik",
-    "progressStatus": "Notification Received",
+    "progressStatus": "Closed",
     "extraction": {
       "rawText": "kalmiantan express\nFire reported in cargo hold while at Kalimantan anchorage.\nCargo pulp damaged.\nDate 20 Jan 2026.\nSurveyor to be appointed.",
       "summary": "kalmiantan express\nFire reported in cargo hold while at Kalimantan anchorage.\nCargo pulp damaged.\nDate 20 Jan 2026.\nSurveyor to be appointed.",
@@ -818,9 +958,11 @@
     "finance": {
       "currency": "USD",
       "reserveEstimated": 0,
+      "cashOut": 0,
       "deductible": 0,
+      "recoverableExpected": 0,
       "recovered": 0,
-      "outstanding": 0,
+      "outstandingRecovery": 0,
       "notes": ""
     },
     "files": [],
@@ -830,6 +972,12 @@
         "by": "Kartik",
         "status": "Notification Received",
         "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-24T06:20:02.292Z",
+        "by": "Yuqing",
+        "status": "Closed",
+        "note": "Progress updated"
       }
     ],
     "auditTrail": [
@@ -838,6 +986,12 @@
         "by": "Kartik",
         "action": "CLAIM_CREATED",
         "note": "Created claim from first notification"
+      },
+      {
+        "at": "2026-01-24T06:20:02.292Z",
+        "by": "Yuqing",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Closed"
       }
     ]
   }
