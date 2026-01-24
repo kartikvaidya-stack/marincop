@@ -173,6 +173,14 @@ async function getDueReminders(req, res) {
   }
 }
 
+/**
+ * GET /api/claims/reminders
+ * For now: same output as "due" (safe + keeps UI working)
+ */
+async function getReminders(req, res) {
+  return getDueReminders(req, res);
+}
+
 module.exports = {
   createClaim,
   listClaims,
@@ -182,4 +190,5 @@ module.exports = {
   patchAction,
   getDrafts,
   getDueReminders,
+  getReminders,
 };
