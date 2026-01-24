@@ -1,36 +1,31 @@
 // backend/app.js
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
 
-const claimsRouter = require("./routes/claims");
-const draftsRouter = require("./routes/drafts");
+const claimsRoutes = require("./routes/claims");
 
 const app = express();
 
-app.set("trust proxy", true);
-
-/**
- * CORS
- * NOTE:
- * We do NOT use cookies/sessions yet, so credentials must be false.
- * This avoids the invalid combination: origin="*" + credentials=true.
- */
+// --- Core middleware (MUST be before routes) ---
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : "*",
-    credentials: false,
+    origin: true,
+    credentials: true,
   })
 );
 
+// Ensure JSON bodies are parsed for POST/PATCH/PUT
 app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-/**
- * Health check
- */
-app.get("/api/health", (req, res) => {
+// Helpful debug: if JSON parsing failed or body missing, we still don't crash later
+app.use((req, _res, next) => {
+  if (req.body === undefined) req.body = {};
+  next();
+});
+
+// --- Routes ---
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "marincop-backend",
@@ -39,38 +34,20 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-/**
- * Claims API
- */
-app.use("/api/claims", claimsRouter);
+app.use("/api/claims", claimsRoutes);
 
-/**
- * Drafts API
- * POST /api/claims/:claimId/drafts
- */
-app.use("/api/claims", draftsRouter);
-
-/**
- * 404 handler
- */
-app.use((req, res) => {
-  res.status(404).json({
-    ok: false,
-    error: "Not Found",
-    path: req.originalUrl,
-  });
+// --- 404 ---
+app.use((_req, res) => {
+  res.status(404).json({ ok: false, error: "NotFound", message: "Route not found" });
 });
 
-/**
- * Error handler
- */
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
-
-  res.status(err.status || 500).json({
+// --- Error handler ---
+app.use((err, _req, res, _next) => {
+  console.error("❌ API Error:", err);
+  res.status(500).json({
     ok: false,
-    error: err.name || "ServerError",
-    message: err.message || "Unexpected server error",
+    error: err?.name || "ServerError",
+    message: err?.message || "Unhandled error",
   });
 });
 

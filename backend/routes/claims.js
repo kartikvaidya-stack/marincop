@@ -1,5 +1,4 @@
 // backend/routes/claims.js
-
 const express = require("express");
 const router = express.Router();
 
@@ -12,6 +11,7 @@ const {
   patchAction,
   getDrafts,
   getDueReminders,
+  getReminders,
 } = require("../controllers/claimsController");
 
 // LIST + CREATE
@@ -20,9 +20,7 @@ router.post("/", createClaim);
 
 // REMINDERS (place before /:id to avoid param conflicts)
 router.get("/reminders/due", getDueReminders);
-
-// IMPORTANT: put drafts BEFORE "/:id"
-router.get("/:id/drafts", getDrafts);
+router.get("/reminders", getReminders);
 
 // SINGLE CLAIM
 router.get("/:id", getClaim);
@@ -31,5 +29,8 @@ router.get("/:id", getClaim);
 router.patch("/:id/progress", patchProgress);
 router.patch("/:id/finance", patchFinance);
 router.patch("/:id/actions/:actionId", patchAction);
+
+// DRAFTS
+router.get("/:id/drafts", getDrafts);
 
 module.exports = router;

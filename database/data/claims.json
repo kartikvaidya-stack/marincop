@@ -1,5 +1,464 @@
 [
   {
+    "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36",
+    "claimNumber": "MC-NOVA-2026-0018",
+    "company": "Nova Carriers",
+    "createdAt": "2026-01-24T13:54:25.461Z",
+    "createdBy": "Kartik",
+    "updatedAt": "2026-01-24T13:55:29.063Z",
+    "progressStatus": "Notification Received",
+    "extraction": {
+      "rawText": "MV Jal nidhi\ncollision at Sea\nLocation English Channel\nPollution\n15 jan 2026",
+      "summary": "MV Jal nidhi\ncollision at Sea\nLocation English Channel\nPollution\n15 jan 2026",
+      "vesselName": "MV Jal nidhi",
+      "imo": null,
+      "eventDateText": "15 jan 2026",
+      "locationText": null,
+      "incidentKeywords": [
+        "collision",
+        "pollution"
+      ],
+      "counterpartyText": null
+    },
+    "classification": {
+      "covers": [
+        {
+          "type": "P&I",
+          "confidence": 0.85,
+          "reasoning": "Indicators of third-party liabilities (contact/collision/injury/pollution/berth damage) align with P&I."
+        }
+      ]
+    },
+    "vesselName": "MV Jal nidhi",
+    "eventDateText": "15 jan 2026",
+    "locationText": null,
+    "covers": [
+      "P&I"
+    ],
+    "actions": [
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A1",
+        "title": "Create claim file and preserve evidence",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:55:29.063Z",
+        "reminderAt": "2026-01-30T13:55:00.000Z",
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A2",
+        "title": "Confirm cover(s) and notify relevant insurers/club",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A3",
+        "title": "Collect supporting documents (log extracts, photos, reports)",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-25T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A4",
+        "title": "Appoint / confirm surveyor (if required)",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A5",
+        "title": "Establish initial reserve / cash-out and deductible impact",
+        "ownerRole": "Finance",
+        "dueAt": "2026-01-26T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A6",
+        "title": "Track updates and maintain status log",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A7",
+        "title": "Identify third-party involvement and liability exposure",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A8",
+        "title": "Obtain statements (Master/crew) and incident report",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-25T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36-A9",
+        "title": "Notify relevant correspondents / local agents if needed",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T13:54:25.461Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T13:54:25.461Z",
+        "updatedAt": "2026-01-24T13:54:25.461Z",
+        "reminderAt": null,
+        "notes": ""
+      }
+    ],
+    "finance": {
+      "currency": "USD",
+      "reserveEstimated": 2000000,
+      "paid": 1000000,
+      "recoverable": 900000,
+      "outstanding": 850000,
+      "cashOut": 1000000,
+      "deductible": 100000,
+      "recoverableExpected": 900000,
+      "recovered": 50000,
+      "outstandingRecovery": 850000,
+      "notes": ""
+    },
+    "files": [],
+    "statusLog": [
+      {
+        "at": "2026-01-24T13:54:25.461Z",
+        "by": "Kartik",
+        "status": "Notification Received",
+        "note": "Claim created from first notification."
+      }
+    ],
+    "auditTrail": [
+      {
+        "at": "2026-01-24T13:54:25.461Z",
+        "by": "Kartik",
+        "action": "CLAIM_CREATED",
+        "note": "Claim created from first notification text."
+      },
+      {
+        "at": "2026-01-24T13:54:55.303Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=1000000, deductible=100000, recovered=0, outstanding=900000)"
+      },
+      {
+        "at": "2026-01-24T13:55:20.039Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=1000000, deductible=100000, recovered=50000, outstanding=850000)"
+      },
+      {
+        "at": "2026-01-24T13:55:29.063Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Create claim file and preserve evidence (status=OPEN)"
+      }
+    ]
+  },
+  {
+    "id": "621edd2e-9708-4c21-9277-71b24b5d4b73",
+    "claimNumber": "MC-NOVA-2026-0017",
+    "company": "Nova Carriers",
+    "createdAt": "2026-01-24T10:18:22.134Z",
+    "createdBy": "Kartik",
+    "updatedAt": "2026-01-24T13:53:14.750Z",
+    "progressStatus": "Settlement Negotiation",
+    "extraction": {
+      "rawText": "MV Medan Express\nLoss of anchor at Singapore\n21 January 2026, 1000 hrs.",
+      "summary": "MV Medan Express\nLoss of anchor at Singapore\n21 January 2026, 1000 hrs.",
+      "vesselName": "MV Medan Express",
+      "imo": null,
+      "eventDateText": "21 January 2026, 1000 hrs.",
+      "locationText": null,
+      "incidentKeywords": [],
+      "counterpartyText": null
+    },
+    "classification": {
+      "covers": [
+        {
+          "type": "To Be Confirmed",
+          "confidence": 0.5,
+          "reasoning": "Insufficient information to classify confidently; requires further details."
+        }
+      ]
+    },
+    "vesselName": "MV Medan Express",
+    "eventDateText": "21 January 2026, 1000 hrs.",
+    "locationText": null,
+    "covers": [
+      "To Be Confirmed"
+    ],
+    "actions": [
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A1",
+        "title": "Create claim file and preserve evidence",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T10:18:22.134Z",
+        "status": "DONE",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:28:41.463Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A2",
+        "title": "Confirm cover(s) and notify relevant insurers/club",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T10:18:22.134Z",
+        "status": "DONE",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:28:44.996Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A3",
+        "title": "Collect supporting documents (log extracts, photos, reports)",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-25T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:18:22.134Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A4",
+        "title": "Appoint / confirm surveyor (if required)",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:27:58.696Z",
+        "reminderAt": "2026-01-26T10:27:00.000Z",
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A5",
+        "title": "Establish initial reserve / cash-out and deductible impact",
+        "ownerRole": "Finance",
+        "dueAt": "2026-01-26T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:30:15.826Z",
+        "reminderAt": "2026-01-27T10:30:00.000Z",
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A6",
+        "title": "Track updates and maintain status log",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-24T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T13:50:59.144Z",
+        "reminderAt": "2026-01-30T13:50:00.000Z",
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A7",
+        "title": "Identify third-party involvement and liability exposure",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T13:51:42.420Z",
+        "reminderAt": "2026-01-29T13:51:00.000Z",
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A8",
+        "title": "Obtain statements (Master/crew) and incident report",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-25T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:18:22.134Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "621edd2e-9708-4c21-9277-71b24b5d4b73-A9",
+        "title": "Notify relevant correspondents / local agents if needed",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T10:18:22.134Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-24T10:18:22.134Z",
+        "updatedAt": "2026-01-24T10:18:22.134Z",
+        "reminderAt": null,
+        "notes": ""
+      }
+    ],
+    "finance": {
+      "currency": "USD",
+      "reserveEstimated": 200000,
+      "paid": 100000,
+      "recoverable": 0,
+      "outstanding": 0,
+      "cashOut": 100000,
+      "deductible": 100000,
+      "recoverableExpected": 0,
+      "recovered": 50000,
+      "outstandingRecovery": 0,
+      "notes": ""
+    },
+    "files": [],
+    "statusLog": [
+      {
+        "at": "2026-01-24T10:18:22.134Z",
+        "by": "Kartik",
+        "status": "Notification Received",
+        "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-24T10:27:44.743Z",
+        "by": "Kartik",
+        "status": "Insurers Notified",
+        "note": "Progress updated"
+      },
+      {
+        "at": "2026-01-24T10:34:15.139Z",
+        "by": "Kartik",
+        "status": "Survey Appointed",
+        "note": "Progress updated"
+      },
+      {
+        "at": "2026-01-24T13:53:14.750Z",
+        "by": "Kartik",
+        "status": "Settlement Negotiation",
+        "note": "Progress updated"
+      }
+    ],
+    "auditTrail": [
+      {
+        "at": "2026-01-24T10:18:22.134Z",
+        "by": "Kartik",
+        "action": "CLAIM_CREATED",
+        "note": "Claim created from first notification text."
+      },
+      {
+        "at": "2026-01-24T10:27:18.052Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=0, deductible=0, recovered=0, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T10:27:25.350Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=0, deductible=0, recovered=0, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T10:27:44.743Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Insurers Notified"
+      },
+      {
+        "at": "2026-01-24T10:27:58.696Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Appoint / confirm surveyor (if required) (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T10:28:41.463Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Create claim file and preserve evidence (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T10:28:44.996Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Confirm cover(s) and notify relevant insurers/club (status=DONE)"
+      },
+      {
+        "at": "2026-01-24T10:29:35.941Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=100000, deductible=100000, recovered=25000, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T10:30:15.826Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Establish initial reserve / cash-out and deductible impact (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T10:32:16.524Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=100000, deductible=100000, recovered=25000, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T10:33:37.361Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=100000, deductible=100000, recovered=25000, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T10:34:15.139Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Survey Appointed"
+      },
+      {
+        "at": "2026-01-24T13:50:59.144Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Track updates and maintain status log (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T13:51:30.063Z",
+        "by": "Kartik",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (paid=100000, deductible=100000, recovered=50000, outstanding=0)"
+      },
+      {
+        "at": "2026-01-24T13:51:42.420Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Identify third-party involvement and liability exposure (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T13:53:14.750Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Settlement Negotiation"
+      }
+    ]
+  },
+  {
     "id": "9251f5b2-5c88-4242-8c3e-7778e7068ac6",
     "claimNumber": "MC-NOVA-2026-0016",
     "company": "Nova Carriers",
@@ -1819,7 +2278,7 @@
     "claimNumber": "MC-NOVA-2026-0005",
     "company": "Nova Carriers",
     "createdAt": "2026-01-22T14:41:48.297Z",
-    "updatedAt": "2026-01-24T06:44:57.287Z",
+    "updatedAt": "2026-01-24T10:34:36.238Z",
     "createdBy": "Kartik",
     "progressStatus": "Insurers Notified",
     "extraction": {
@@ -1928,8 +2387,8 @@
         "dueAt": "2026-01-23T14:41:48.297Z",
         "status": "OPEN",
         "createdAt": "2026-01-22T14:41:48.297Z",
-        "updatedAt": "2026-01-22T14:41:48.297Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-24T10:34:36.238Z",
+        "reminderAt": "2026-01-29T10:34:00.000Z",
         "notes": ""
       },
       {
@@ -2071,6 +2530,12 @@
         "by": "Kartik",
         "action": "ACTION_UPDATED",
         "note": "Action updated: Collect supporting documents (log extracts, photos, reports) (status=OPEN)"
+      },
+      {
+        "at": "2026-01-24T10:34:36.238Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Obtain statements (Master/crew) and incident report (status=OPEN)"
       }
     ]
   },

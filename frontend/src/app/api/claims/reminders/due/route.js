@@ -1,32 +1,36 @@
+// frontend/src/app/api/claims/reminders/route.js
 import { NextResponse } from "next/server";
 
-function backendBase() {
-  return (
-    process.env.BACKEND_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_URL || // fallback only
-    "http://localhost:3001"
-  );
-}
+export async function GET(req) {
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!backend) {
+    return NextResponse.json(
+      { ok: false, error: "ProxyError", message: "NEXT_PUBLIC_BACKEND_URL missing" },
+      { status: 500 }
+    );
+  }
 
-export async function GET() {
+  const { searchParams } = new URL(req.url);
+  const days = searchParams.get("days") || "30";
+
+  const url = `${backend.replace(/\/$/, "")}/api/claims/reminders?days=${encodeURIComponent(days)}`;
+
   try {
-    const url = `${backendBase().replace(/\/$/, "")}/api/claims/reminders/due`;
     const r = await fetch(url, { cache: "no-store" });
     const text = await r.text();
-
-    // backend should return json; guard anyway
+    let json;
     try {
-      const json = JSON.parse(text);
-      return NextResponse.json(json, { status: r.status });
+      json = JSON.parse(text);
     } catch {
       return NextResponse.json(
-        { ok: false, error: "BadGateway", message: "Backend returned non-JSON", raw: text },
+        { ok: false, error: "ProxyError", message: "Backend did not return JSON", raw: text.slice(0, 120) },
         { status: 502 }
       );
     }
+    return NextResponse.json(json, { status: r.status });
   } catch (e) {
     return NextResponse.json(
-      { ok: false, error: "FetchError", message: e?.message || "Failed to reach backend" },
+      { ok: false, error: "ProxyError", message: e.message },
       { status: 502 }
     );
   }
