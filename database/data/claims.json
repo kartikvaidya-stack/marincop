@@ -2899,13 +2899,13 @@
     ],
     "finance": {
       "currency": "USD",
-      "reserveEstimated": 0,
-      "cashOut": 0,
-      "deductible": 0,
-      "recoverableExpected": 0,
-      "recovered": 0,
-      "outstandingRecovery": 0,
-      "notes": ""
+      "reserveEstimated": 500000,
+      "cashOut": 400000,
+      "deductible": 50000,
+      "recoverableExpected": 350000,
+      "recovered": 100000,
+      "outstandingRecovery": 250000,
+      "notes": "Fire damage claim - initial reserve and recovery estimates"
     },
     "files": [],
     "statusLog": [
