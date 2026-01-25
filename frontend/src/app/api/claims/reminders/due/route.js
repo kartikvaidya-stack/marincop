@@ -1,4 +1,4 @@
-// frontend/src/app/api/claims/reminders/route.js
+// frontend/src/app/api/claims/reminders/due/route.js
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -10,10 +10,7 @@ export async function GET(req) {
     );
   }
 
-  const { searchParams } = new URL(req.url);
-  const days = searchParams.get("days") || "30";
-
-  const url = `${backend.replace(/\/$/, "")}/api/claims/reminders?days=${encodeURIComponent(days)}`;
+  const url = `${backend.replace(/\/$/, "")}/api/claims/reminders/due`;
 
   try {
     const r = await fetch(url, { cache: "no-store" });

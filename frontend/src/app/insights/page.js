@@ -57,23 +57,8 @@ export default function InsightsPage() {
   }, [claims]);
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto", background: "#f6f8fb", minHeight: "100vh" }}>
-      <div style={{ background: "white", borderBottom: "1px solid #e6eaf2" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 16px", display: "flex", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>Marincop</div>
-            <div style={{ fontSize: 12, color: "#556" }}>Nova Carriers</div>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Link href="/" style={{ textDecoration: "none", color: "#223", fontWeight: 600 }}>Claims</Link>
-            <Link href="/finance" style={{ textDecoration: "none", color: "#223" }}>Finance</Link>
-            <Link href="/reminders" style={{ textDecoration: "none", color: "#223" }}>Reminders</Link>
-            <Link href="/insights" style={{ textDecoration: "none", color: "#223", fontWeight: 700 }}>Insights</Link>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
+    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto", background: "#f6f8fb", minHeight: "100vh", padding: 16 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800 }}>Insights</div>

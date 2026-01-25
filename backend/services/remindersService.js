@@ -2,73 +2,125 @@
 const fs = require("fs");
 const path = require("path");
 
-function claimsFilePath() {
-  // This matches your repo structure: /database/data/claims.json
-  return path.join(process.cwd(), "database", "data", "claims.json");
-}
+/**
+ * Uses the same JSON file as claimService (database/data/claims.json).
+ * Uses __dirname to ensure consistent path resolution regardless of where the process is started.
+ */
+const CLAIMS_PATH = path.join(__dirname, "../../database/data/claims.json");
 
-function safeReadClaims() {
-  const file = claimsFilePath();
+function readClaims() {
   try {
-    if (!fs.existsSync(file)) return [];
-    const raw = fs.readFileSync(file, "utf-8");
-    const parsed = JSON.parse(raw || "[]");
+    if (!fs.existsSync(CLAIMS_PATH)) return [];
+    const raw = fs.readFileSync(CLAIMS_PATH, "utf-8");
+    if (!raw || !raw.trim()) return [];
+    const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    // If JSON is corrupted, return empty rather than crash the server
-    console.error("remindersService.safeReadClaims error:", e.message);
+    // If file is corrupted / invalid, fail safe to empty array
     return [];
   }
 }
 
-function normalizeCoverTypes(claim) {
-  if (Array.isArray(claim?.covers)) return claim.covers;
-  if (Array.isArray(claim?.classification?.covers))
-    return claim.classification.covers.map((c) => c.type).filter(Boolean);
-  return [];
+function toISO(d) {
+  try {
+    return new Date(d).toISOString();
+  } catch {
+    return null;
+  }
 }
 
-function getReminders({ days = 30 } = {}) {
-  const claims = safeReadClaims();
+function normalizeReminderItem({ claim, action }) {
+  return {
+    claimId: claim.id,
+    claimNumber: claim.claimNumber,
+    vesselName: claim.vesselName || claim?.extraction?.vesselName || null,
+    progressStatus: claim.progressStatus || "Unknown",
+    coverTypes: Array.isArray(claim.covers) ? claim.covers : [],
+    actionId: action.id,
+    actionTitle: action.title,
+    ownerRole: action.ownerRole || null,
+    reminderAt: action.reminderAt || null,
+    dueAt: action.dueAt || null,
+  };
+}
+
+/**
+ * Get ALL reminders (both overdue and upcoming).
+ * Query params (optional):
+ * - daysAhead: number (default 30) -> upcoming window
+ * - includeDone: "true"|"false" (default false)
+ */
+function getReminders({ daysAhead = 30, includeDone = false } = {}) {
+  const claims = readClaims();
 
   const now = new Date();
-  const end = new Date(now.getTime() + Number(days) * 24 * 60 * 60 * 1000);
+  const nowMs = now.getTime();
+  const windowMs = Number(daysAhead) * 24 * 60 * 60 * 1000;
+  const upperMs = nowMs + windowMs;
 
-  const rows = [];
+  const items = [];
 
-  for (const c of claims) {
-    const actions = Array.isArray(c?.actions) ? c.actions : [];
-    for (const a of actions) {
-      if (!a?.reminderAt) continue;
+  for (const claim of claims) {
+    const actions = Array.isArray(claim.actions) ? claim.actions : [];
+    for (const action of actions) {
+      if (!action || !action.reminderAt) continue;
+      if (!includeDone && String(action.status || "").toUpperCase() === "DONE") continue;
 
-      const rAt = new Date(a.reminderAt);
-      if (Number.isNaN(rAt.getTime())) continue;
+      const rMs = new Date(action.reminderAt).getTime();
+      if (Number.isNaN(rMs)) continue;
 
-      const isOverdue = rAt.getTime() <= now.getTime();
-      const isUpcoming = rAt.getTime() > now.getTime() && rAt.getTime() <= end.getTime();
-
-      // Include overdue OR upcoming-in-window
-      if (!isOverdue && !isUpcoming) continue;
-
-      rows.push({
-        claimId: c.id,
-        claimNumber: c.claimNumber,
-        vesselName: c.vesselName || c.extraction?.vesselName || null,
-        progressStatus: c.progressStatus || "—",
-        coverTypes: normalizeCoverTypes(c),
-        actionId: a.id,
-        actionTitle: a.title || "—",
-        ownerRole: a.ownerRole || "—",
-        reminderAt: a.reminderAt,
-        dueAt: a.dueAt || null,
-        overdue: isOverdue,
-      });
+      // include overdue OR within upcoming window
+      if (rMs <= upperMs) {
+        items.push(normalizeReminderItem({ claim, action }));
+      }
     }
   }
 
-  rows.sort((x, y) => new Date(x.reminderAt).getTime() - new Date(y.reminderAt).getTime());
+  // Sort: overdue first, then nearest upcoming
+  items.sort((a, b) => {
+    const am = new Date(a.reminderAt).getTime();
+    const bm = new Date(b.reminderAt).getTime();
+    return am - bm;
+  });
 
-  return rows;
+  return items;
 }
 
-module.exports = { getReminders };
+/**
+ * Get reminders that are due/overdue OR upcoming (within 30 days).
+ * This includes both past reminders (overdue) and future reminders (upcoming).
+ */
+function getDueReminders() {
+  const claims = readClaims();
+  const nowMs = Date.now();
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const futureMs = nowMs + thirtyDaysMs;
+
+  const items = [];
+
+  for (const claim of claims) {
+    const actions = Array.isArray(claim.actions) ? claim.actions : [];
+    for (const action of actions) {
+      if (!action || !action.reminderAt) continue;
+
+      const status = String(action.status || "").toUpperCase();
+      if (status === "DONE") continue;
+
+      const rMs = new Date(action.reminderAt).getTime();
+      if (Number.isNaN(rMs)) continue;
+
+      // Include reminders that are overdue OR within next 30 days
+      if (rMs <= futureMs) {
+        items.push(normalizeReminderItem({ claim, action }));
+      }
+    }
+  }
+
+  items.sort((a, b) => new Date(a.reminderAt).getTime() - new Date(b.reminderAt).getTime());
+  return items;
+}
+
+module.exports = {
+  getReminders,
+  getDueReminders,
+};

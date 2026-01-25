@@ -1,111 +1,176 @@
 // backend/services/claimService.js
+// Self-contained claim service backed by JSON file storage.
+// Restores full draft templates and ensures drafts never return null.
+
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
+const { randomUUID } = require("crypto");
 
-// ---------- File storage ----------
-function claimsFilePath() {
-  // project root is where you run: cd ~/marincop && npm run dev
-  return path.join(process.cwd(), "database", "data", "claims.json");
-}
+const DB_PATH = path.join(__dirname, "../../database/data/claims.json");
 
-function ensureClaimsFile() {
-  const fp = claimsFilePath();
-  const dir = path.dirname(fp);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(fp)) fs.writeFileSync(fp, JSON.stringify([], null, 2), "utf8");
-}
-
-function readAllClaims() {
-  ensureClaimsFile();
-  const raw = fs.readFileSync(claimsFilePath(), "utf8");
-  try {
-    const data = JSON.parse(raw || "[]");
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeAllClaims(claims) {
-  ensureClaimsFile();
-  fs.writeFileSync(claimsFilePath(), JSON.stringify(claims, null, 2), "utf8");
-}
-
-// ---------- Small helpers ----------
 function nowIso() {
   return new Date().toISOString();
 }
 
-function safeNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+function safeParseJson(str, fallback) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
 }
 
-function max0(n) {
-  return Math.max(0, safeNum(n));
+function readClaims() {
+  try {
+    if (!fs.existsSync(DB_PATH)) {
+      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+      fs.writeFileSync(DB_PATH, JSON.stringify([], null, 2), "utf8");
+    }
+    const raw = fs.readFileSync(DB_PATH, "utf8");
+    const data = safeParseJson(raw, []);
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    // If file corrupt, don't crash server
+    return [];
+  }
 }
 
-function uid() {
-  return crypto.randomUUID();
+function writeClaims(claims) {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  fs.writeFileSync(DB_PATH, JSON.stringify(claims, null, 2), "utf8");
 }
 
-// ---------- Extraction (basic) ----------
-function extractFromText(rawText) {
-  const text = String(rawText || "");
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+function ensureArrays(claim) {
+  if (!claim.statusLog || !Array.isArray(claim.statusLog)) claim.statusLog = [];
+  if (!claim.auditTrail || !Array.isArray(claim.auditTrail)) claim.auditTrail = [];
+  if (!claim.actions || !Array.isArray(claim.actions)) claim.actions = [];
+  if (!claim.files || !Array.isArray(claim.files)) claim.files = [];
+  if (!claim.finance || typeof claim.finance !== "object" || claim.finance === null) {
+    claim.finance = {};
+  }
+  return claim;
+}
 
-  // Vessel name patterns: "Vessel: MV XXX", "M/V XXX", "MV XXX", "MT XXX"
+function computeFinance(fin) {
+  const currency = fin.currency || "USD";
+
+  const reserveEstimated = Number(fin.reserveEstimated || 0);
+  // cashOut is the owner's cash paid out (can increase)
+  // accept legacy "paid" too
+  const cashOut = Number(fin.cashOut ?? fin.paid ?? 0);
+  const paid = cashOut; // keep legacy alias
+  const deductible = Number(fin.deductible || 0);
+
+  // recoverableExpected = paid/cashOut minus deductible (never < 0)
+  const recoverableExpected = Number(fin.recoverableExpected ?? Math.max(0, cashOut - deductible));
+
+  // recovered = actual recovery received from insurers/third parties
+  const recovered = Number(fin.recovered || 0);
+
+  // outstandingRecovery = remaining to recover
+  const outstandingRecovery = Number(fin.outstandingRecovery ?? Math.max(0, recoverableExpected - recovered));
+
+  // legacy aliases
+  const recoverable = recoverableExpected;
+  const outstanding = outstandingRecovery;
+
+  return {
+    currency,
+    reserveEstimated,
+    cashOut,
+    paid,
+    deductible,
+    recoverableExpected,
+    recoverable,
+    recovered,
+    outstandingRecovery,
+    outstanding,
+    notes: fin.notes || "",
+  };
+}
+
+function nextClaimNumber(claims, company = "Nova Carriers") {
+  // MC-NOVA-YYYY-0001
+  const year = new Date().getFullYear();
+  const prefix = "MC-NOVA";
+  const sameYear = claims
+    .map((c) => c.claimNumber)
+    .filter((n) => typeof n === "string" && n.startsWith(`${prefix}-${year}-`));
+
+  let max = 0;
+  for (const n of sameYear) {
+    const parts = n.split("-");
+    const seq = Number(parts[parts.length - 1]);
+    if (!Number.isNaN(seq)) max = Math.max(max, seq);
+  }
+  const next = String(max + 1).padStart(4, "0");
+  return `${prefix}-${year}-${next}`;
+}
+
+function extractBasics(rawText) {
+  const text = (rawText || "").toString();
+
+  // Vessel name: common patterns
+  // 1) Vessel: MV XXX
+  // 2) M/V XXX or MV XXX at start of a line
   let vesselName = null;
 
-  const vesselLine =
-    lines.find((l) => /^vessel\s*:/i.test(l)) ||
-    lines.find((l) => /^(m\/v|mv|m\.v\.|mt|m\/t)\s+/i.test(l));
+  const m1 = text.match(/^\s*Vessel\s*:\s*(.+)\s*$/im);
+  if (m1 && m1[1]) vesselName = m1[1].trim();
 
-  if (vesselLine) {
-    vesselName = vesselLine
-      .replace(/^vessel\s*:\s*/i, "")
-      .replace(/^(m\/v|m\.v\.|mv|m\/t|mt)\s+/i, (m) => m.toUpperCase())
-      .trim();
+  if (!vesselName) {
+    const m2 = text.match(/^\s*(M\/V|MV|MT)\s+([A-Z0-9][A-Z0-9 \-']{2,})\s*$/im);
+    if (m2 && m2[0]) vesselName = m2[0].trim();
   }
 
-  // IMO patterns
+  // IMO
   let imo = null;
-  const imoLine = lines.find((l) => /^imo\s*:/i.test(l)) || lines.find((l) => /\bIMO\b/i.test(l));
-  if (imoLine) {
-    const m = imoLine.match(/(\d{7})/);
-    if (m) imo = m[1];
-  }
+  const imoM = text.match(/\bIMO\s*:\s*([0-9]{7})\b/i);
+  if (imoM) imo = imoM[1];
 
-  // Date patterns (simple: "22 Jan 2026", "21 January 2026", "2026-01-22")
+  // Date text (very lightweight)
   let eventDateText = null;
-  const dateLine =
-    lines.find((l) => /\b\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{4}\b/i.test(l)) ||
-    lines.find((l) => /\b\d{4}-\d{2}-\d{2}\b/.test(l)) ||
-    lines.find((l) => /^date\s*:/i.test(l));
-  if (dateLine) {
-    eventDateText = dateLine.replace(/^date\s*:\s*/i, "").trim();
-  }
+  const dateM = text.match(/\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b/);
+  if (dateM) eventDateText = dateM[1];
 
-  // Location/Position patterns
+  // Location / position
   let locationText = null;
-  const locLine = lines.find((l) => /^(position|location)\s*:/i.test(l));
-  if (locLine) {
-    locationText = locLine.replace(/^(position|location)\s*:\s*/i, "").trim();
-  }
+  const posM = text.match(/^\s*(Position|Location)\s*:\s*(.+)\s*$/im);
+  if (posM && posM[2]) locationText = posM[2].trim();
 
-  // Keywords
+  // Keywords for quick classification
   const lower = text.toLowerCase();
   const incidentKeywords = [];
-  ["collision", "contact", "grounding", "fire", "pollution", "spill", "injury", "death", "cargo", "theft", "piracy", "tow"].forEach(
-    (k) => {
-      if (lower.includes(k)) incidentKeywords.push(k);
-    }
-  );
+  const kw = [
+    "collision",
+    "contact",
+    "grounding",
+    "fire",
+    "explosion",
+    "pollution",
+    "spill",
+    "injury",
+    "death",
+    "cargo damage",
+    "shortage",
+    "wet damage",
+    "pilot",
+    "stevedore",
+    "berth",
+    "quay",
+    "crane",
+    "charter",
+    "chartered",
+    "time charter",
+    "voyage charter",
+  ];
+  for (const k of kw) {
+    if (lower.includes(k)) incidentKeywords.push(k);
+  }
 
   return {
     rawText: text,
-    summary: text.length > 1200 ? text.slice(0, 1200) + "…" : text,
+    summary: text,
     vesselName,
     imo,
     eventDateText,
@@ -115,475 +180,483 @@ function extractFromText(rawText) {
   };
 }
 
-// ---------- Classification ----------
-function classifyFromExtraction(extraction) {
-  const text = (extraction?.rawText || "").toLowerCase();
+function classifyFromText(rawText) {
+  const t = (rawText || "").toLowerCase();
 
   const covers = [];
+  const pushCover = (type, confidence, reasoning) => covers.push({ type, confidence, reasoning });
 
-  // Charterers Liability — important per your feedback
-  const charterHints = [
-    "chartered vessel",
-    "charterer",
-    "charterers",
-    "on hire",
-    "time charter",
-    "voyage charter",
-    "t/c",
-    "v/c",
-    "hired",
-    "fixture",
-  ];
-  const isCharterRelated = charterHints.some((h) => text.includes(h));
-
-  const hasCargo = ["cargo", "wet damage", "contamination", "shortage", "shifted", "pulp", "coal", "grain", "steel", "bags"].some((h) =>
-    text.includes(h)
-  );
-  const hasLiability = ["contact", "collision", "injury", "death", "pilot", "berth", "jetty", "pollution", "spill"].some((h) => text.includes(h));
-  const hasHM = ["damage to hull", "denting", "shell plating", "engine", "machinery", "propeller", "rudder", "fire", "grounding"].some((h) =>
-    text.includes(h)
-  );
-
-  if (isCharterRelated) {
-    covers.push({
-      type: "Charterers Liability",
-      confidence: 0.8,
-      reasoning: "Notification text indicates charterer/hire/fixture context; potential charterers’ liabilities may arise.",
-    });
+  // Charterers Liability detection
+  if (
+    t.includes("chartered") ||
+    t.includes("charterers") ||
+    t.includes("time charter") ||
+    t.includes("voyage charter") ||
+    t.includes("as charterer") ||
+    t.includes("we chartered")
+  ) {
+    pushCover(
+      "Charterers Liability",
+      0.82,
+      "Notification indicates chartered employment / charterer role; exposures typically include charterers’ liabilities and contractual indemnities."
+    );
   }
 
-  if (hasLiability) {
-    covers.push({
-      type: "P&I",
-      confidence: 0.85,
-      reasoning: "Indicators of third-party liabilities (contact/collision/injury/pollution/berth damage) align with P&I.",
-    });
+  // P&I indicators (third party)
+  if (
+    t.includes("pollution") ||
+    t.includes("spill") ||
+    t.includes("injury") ||
+    t.includes("death") ||
+    t.includes("contact") ||
+    t.includes("collision") ||
+    t.includes("berth") ||
+    t.includes("quay") ||
+    t.includes("pilot") ||
+    t.includes("stevedore")
+  ) {
+    pushCover(
+      "P&I",
+      0.85,
+      "Likely third-party liabilities (contact/collision, personal injury, pollution, damage to fixed/floating objects, pilot/stevedore involvement)."
+    );
   }
 
-  if (hasHM) {
-    covers.push({
-      type: "H&M",
-      confidence: 0.75,
-      reasoning: "Indicators of damage to vessel hull/machinery or casualty align with Hull & Machinery cover.",
-    });
+  // H&M indicators (ship physical damage)
+  if (
+    t.includes("damage to hull") ||
+    t.includes("denting") ||
+    t.includes("shell plating") ||
+    t.includes("rudder") ||
+    t.includes("propeller") ||
+    t.includes("machinery") ||
+    t.includes("engine") ||
+    t.includes("grounding") ||
+    t.includes("fire") ||
+    t.includes("flooding")
+  ) {
+    pushCover(
+      "H&M",
+      0.78,
+      "Indications of physical damage to the vessel / machinery suggesting Hull & Machinery involvement."
+    );
   }
 
-  if (hasCargo) {
-    covers.push({
-      type: "Cargo",
-      confidence: 0.7,
-      reasoning: "Indicators of cargo damage/shortage/contamination align with Cargo-related claims handling.",
-    });
+  // Cargo indicators
+  if (
+    t.includes("cargo") ||
+    t.includes("shortage") ||
+    t.includes("wet damage") ||
+    t.includes("contamination") ||
+    t.includes("hold fire") ||
+    t.includes("damage to cargo")
+  ) {
+    pushCover(
+      "Cargo",
+      0.72,
+      "Indications of cargo loss/damage and potential cargo-related exposures."
+    );
   }
 
   if (covers.length === 0) {
-    covers.push({
-      type: "To Be Confirmed",
-      confidence: 0.5,
-      reasoning: "Insufficient information to classify confidently; requires further details.",
-    });
+    pushCover(
+      "To Be Confirmed",
+      0.5,
+      "Insufficient information to classify confidently; requires further details (role, damage, liabilities, cargo, pollution)."
+    );
   }
 
-  return { covers };
+  // Ensure unique types (avoid duplicates)
+  const seen = new Set();
+  const unique = [];
+  for (const c of covers) {
+    if (!seen.has(c.type)) {
+      unique.push(c);
+      seen.add(c.type);
+    }
+  }
+  return { covers: unique };
 }
 
-// ---------- Actions + Drafts ----------
 function defaultActions(claimId, createdAtIso) {
-  const baseDue = new Date(createdAtIso);
-  const plus = (days) => new Date(baseDue.getTime() + days * 24 * 3600 * 1000).toISOString();
-
-  const mk = (n, title, ownerRole, days) => ({
-    id: `${claimId}-A${n}`,
-    title,
-    ownerRole,
-    dueAt: plus(days),
-    status: "OPEN",
-    createdAt: createdAtIso,
-    updatedAt: createdAtIso,
-    reminderAt: null,
-    notes: "",
-  });
+  const base = (n, title, ownerRole, daysDue = 0) => {
+    const due = new Date(createdAtIso);
+    due.setDate(due.getDate() + daysDue);
+    const dueAt = due.toISOString();
+    return {
+      id: `${claimId}-A${n}`,
+      title,
+      ownerRole,
+      dueAt,
+      status: "OPEN",
+      createdAt: createdAtIso,
+      updatedAt: createdAtIso,
+      reminderAt: null,
+      notes: "",
+    };
+  };
 
   return [
-    mk(1, "Create claim file and preserve evidence", "Claims", 0),
-    mk(2, "Confirm cover(s) and notify relevant insurers/club", "Claims", 0),
-    mk(3, "Collect supporting documents (log extracts, photos, reports)", "Ops", 1),
-    mk(4, "Appoint / confirm surveyor (if required)", "Claims", 1),
-    mk(5, "Establish initial reserve / cash-out and deductible impact", "Finance", 2),
-    mk(6, "Track updates and maintain status log", "Claims", 0),
-    mk(7, "Identify third-party involvement and liability exposure", "Claims", 1),
-    mk(8, "Obtain statements (Master/crew) and incident report", "Ops", 1),
-    mk(9, "Notify relevant correspondents / local agents if needed", "Claims", 1),
+    base(1, "Create claim file and preserve evidence", "Claims", 0),
+    base(2, "Confirm cover(s) and notify relevant insurers/club", "Claims", 0),
+    base(3, "Collect supporting documents (log extracts, photos, reports)", "Ops", 1),
+    base(4, "Appoint / confirm surveyor (if required)", "Claims", 1),
+    base(5, "Establish initial reserve / cash-out and deductible impact", "Finance", 2),
+    base(6, "Track updates and maintain status log", "Claims", 0),
+    base(7, "Identify third-party involvement and liability exposure", "Claims", 1),
+    base(8, "Obtain statements (Master/crew) and incident report", "Ops", 1),
+    base(9, "Notify relevant correspondents / local agents if needed", "Claims", 1),
   ];
 }
 
-function draftTemplatesForClaim(claim) {
-  const claimNumber = claim.claimNumber;
-  const vessel = claim.extraction?.vesselName || claim.vesselName || "Vessel";
+// ---------- Public API expected by controllers ----------
+
+function listClaims() {
+  const claims = readClaims().map(ensureArrays);
+  // Summaries used by dashboard
+  return claims.map((c) => {
+    const fin = computeFinance(c.finance || {});
+    return {
+      id: c.id,
+      claimNumber: c.claimNumber,
+      vesselName: c.vesselName ?? c.extraction?.vesselName ?? null,
+      eventDateText: c.eventDateText ?? c.extraction?.eventDateText ?? null,
+      locationText: c.locationText ?? c.extraction?.locationText ?? null,
+      progressStatus: c.progressStatus || "Notification Received",
+      covers: Array.isArray(c.covers) ? c.covers : (c.classification?.covers || []).map((x) => x.type),
+      currency: fin.currency,
+      reserveEstimated: fin.reserveEstimated,
+      cashOut: fin.cashOut,
+      paid: fin.paid,
+      deductible: fin.deductible,
+      recoverableExpected: fin.recoverableExpected,
+      recovered: fin.recovered,
+      outstandingRecovery: fin.outstandingRecovery,
+      // legacy
+      recoverable: fin.recoverable,
+      outstanding: fin.outstanding,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    };
+  });
+}
+
+function createClaim({ createdBy, company, firstNotificationText }) {
+  const claims = readClaims().map(ensureArrays);
+
+  const id = randomUUID();
+  const createdAt = nowIso();
+  const claimNumber = nextClaimNumber(claims, company);
+
+  const extraction = extractBasics(firstNotificationText);
+  const classification = classifyFromText(firstNotificationText);
+  const covers = classification.covers.map((c) => c.type);
+
+  const fin = computeFinance({ currency: "USD" });
+
+  const claim = ensureArrays({
+    id,
+    claimNumber,
+    company: company || "Nova Carriers",
+    createdAt,
+    createdBy: createdBy || "Unknown",
+    updatedAt: createdAt,
+    progressStatus: "Notification Received",
+    extraction,
+    classification,
+    vesselName: extraction.vesselName,
+    eventDateText: extraction.eventDateText,
+    locationText: extraction.locationText,
+    covers,
+    actions: defaultActions(id, createdAt),
+    finance: fin,
+    files: [],
+    statusLog: [
+      { at: createdAt, by: createdBy || "Unknown", status: "Notification Received", note: "Claim created from first notification." },
+    ],
+    auditTrail: [
+      { at: createdAt, by: createdBy || "Unknown", action: "CLAIM_CREATED", note: "Claim created from first notification text." },
+    ],
+  });
+
+  claims.unshift(claim);
+  writeClaims(claims);
+  return claim;
+}
+
+function getClaim(id) {
+  const claims = readClaims().map(ensureArrays);
+  const c = claims.find((x) => x.id === id);
+  if (!c) return null;
+
+  // Recompute finance on the fly to keep fields consistent
+  c.finance = computeFinance(c.finance || {});
+  return c;
+}
+
+function patchProgress(id, { by, progressStatus }) {
+  const claims = readClaims().map(ensureArrays);
+  const idx = claims.findIndex((x) => x.id === id);
+  if (idx < 0) return null;
+
+  const c = ensureArrays(claims[idx]);
+  const at = nowIso();
+  c.progressStatus = progressStatus || c.progressStatus;
+  c.updatedAt = at;
+
+  c.statusLog.push({ at, by: by || "Unknown", status: c.progressStatus, note: "Progress updated" });
+  c.auditTrail.push({ at, by: by || "Unknown", action: "STATUS_UPDATED", note: `Progress set to: ${c.progressStatus}` });
+
+  claims[idx] = c;
+  writeClaims(claims);
+  return c;
+}
+
+function patchFinance(id, { by, finance }) {
+  const claims = readClaims().map(ensureArrays);
+  const idx = claims.findIndex((x) => x.id === id);
+  if (idx < 0) return null;
+
+  const c = ensureArrays(claims[idx]);
+  const at = nowIso();
+
+  const merged = { ...(c.finance || {}), ...(finance || {}) };
+  c.finance = computeFinance(merged);
+
+  // Keep top-level shortcuts aligned
+  c.updatedAt = at;
+
+  c.auditTrail.push({
+    at,
+    by: by || "Unknown",
+    action: "FINANCE_UPDATED",
+    note: `Finance updated (reserve=${c.finance.reserveEstimated}, cashOut=${c.finance.cashOut}, recovered=${c.finance.recovered}, outstandingRecovery=${c.finance.outstandingRecovery})`,
+  });
+
+  claims[idx] = c;
+  writeClaims(claims);
+  return c;
+}
+
+function patchAction(id, actionId, { by, status, notes, reminderAt }) {
+  const claims = readClaims().map(ensureArrays);
+  const idx = claims.findIndex((x) => x.id === id);
+  if (idx < 0) return null;
+
+  const c = ensureArrays(claims[idx]);
+  const at = nowIso();
+
+  const aIdx = c.actions.findIndex((a) => a.id === actionId);
+  if (aIdx < 0) return null;
+
+  const action = { ...c.actions[aIdx] };
+  if (status) action.status = status;
+  if (typeof notes === "string") action.notes = notes;
+  if (typeof reminderAt === "string") action.reminderAt = reminderAt;
+  action.updatedAt = at;
+
+  c.actions[aIdx] = action;
+  c.updatedAt = at;
+
+  c.auditTrail.push({
+    at,
+    by: by || "Unknown",
+    action: "ACTION_UPDATED",
+    note: `Action updated: ${action.title} (status=${action.status}${action.reminderAt ? ", reminderAt set" : ""})`,
+  });
+
+  claims[idx] = c;
+  writeClaims(claims);
+  return action;
+}
+
+function getDrafts(id) {
+  const claim = getClaim(id);
+  if (!claim) return [];
+
+  const vessel = claim.vesselName || claim.extraction?.vesselName || "Vessel";
   const imo = claim.extraction?.imo ? ` (IMO ${claim.extraction.imo})` : "";
-  const eventDate = claim.extraction?.eventDateText || claim.eventDateText || "(date tbc)";
-  const location = claim.extraction?.locationText || claim.locationText || "(location tbc)";
-  const desc = (claim.extraction?.rawText || "").trim();
+  const when = claim.extraction?.eventDateText || "Date TBC";
+  const where = claim.extraction?.locationText || "Location TBC";
+  const claimNo = claim.claimNumber || id;
 
-  const covers = Array.isArray(claim.covers) ? claim.covers : [];
-  const hasPI = covers.includes("P&I");
-  const hasHM = covers.includes("H&M");
-  const hasCharter = covers.includes("Charterers Liability");
+  const raw = claim.extraction?.rawText || "";
+  const covers = Array.isArray(claim.covers) && claim.covers.length ? claim.covers.join(", ") : "To Be Confirmed";
+  const fin = computeFinance(claim.finance || {});
+  const company = claim.company || "Nova Carriers";
 
-  const drafts = [];
-
-  if (hasPI) {
-    drafts.push({
+  // IMPORTANT: always return an ARRAY (never null)
+  const drafts = [
+    {
       type: "P&I_NOTIFICATION",
-      subject: `[${claimNumber}] - ${vessel}${imo} - P&I Notification (Initial)`,
+      subject: `[${claimNo}] - ${vessel} - P&I Notification (Initial)`,
       body:
         `Dear P&I Club / Correspondents,\n\n` +
         `We hereby give initial notification of an incident that may give rise to liabilities and/or costs falling within P&I cover.\n\n` +
-        `Claim Ref: ${claimNumber}\nVessel: ${vessel}${imo}\nDate/Time (as advised): ${eventDate}\nLocation/Position: ${location}\n\n` +
-        `Initial description (as received):\n${desc}\n\n` +
+        `Claim Ref: ${claimNo}\n` +
+        `Vessel: ${vessel}${imo}\n` +
+        `Date/Time (as advised): ${when}\n` +
+        `Location/Position: ${where}\n` +
+        `Cover indication: ${covers}\n\n` +
+        `Initial description (as received):\n` +
+        `${raw}\n\n` +
         `Immediate actions taken / proposed:\n` +
         `- Evidence preservation initiated (photos, statements, log extracts)\n` +
         `- Request guidance on next steps and appointment of surveyor (if required)\n` +
         `- Please advise any specific reporting format / documents required\n\n` +
         `Kindly acknowledge receipt and advise recommended course of action, including any correspondent/surveyor nomination.\n\n` +
-        `Best regards,\nNova Carriers\n(Claims Team)`,
-    });
-  }
-
-  if (hasHM) {
-    drafts.push({
-      type: "HM_NOTIFICATION",
-      subject: `[${claimNumber}] - ${vessel}${imo} - H&M Notification (Initial)`,
+        `Best regards,\n${company}\n(Claims Team)`
+    },
+    {
+      type: "H&M_NOTIFICATION",
+      subject: `[${claimNo}] - ${vessel} - H&M Notification (Initial)`,
       body:
-        `Dear Underwriters,\n\n` +
-        `We hereby notify an incident that may give rise to a claim under Hull & Machinery.\n\n` +
-        `Claim Ref: ${claimNumber}\nVessel: ${vessel}${imo}\nDate/Time (as advised): ${eventDate}\nLocation/Position: ${location}\n\n` +
-        `Initial description (as received):\n${desc}\n\n` +
-        `We will follow with supporting documents and surveyor details as available.\n\n` +
-        `Best regards,\nNova Carriers\n(Claims Team)`,
-    });
-  }
-
-  if (hasCharter) {
-    drafts.push({
-      type: "CHARTERERS_LIABILITY_NOTICE",
-      subject: `[${claimNumber}] - ${vessel}${imo} - Charterers Liability Notice (Initial)`,
+        `Dear Hull Underwriters / Brokers,\n\n` +
+        `We give notice of an occurrence which may give rise to a claim under the Hull & Machinery policy.\n\n` +
+        `Claim Ref: ${claimNo}\n` +
+        `Vessel: ${vessel}${imo}\n` +
+        `Date/Time (as advised): ${when}\n` +
+        `Location/Position: ${where}\n\n` +
+        `Initial description (as received):\n${raw}\n\n` +
+        `Please advise if surveyor appointment is required and any immediate actions under the policy conditions.\n\n` +
+        `Best regards,\n${company}\n(Claims Team)`
+    },
+    {
+      type: "SURVEYOR_APPOINTMENT",
+      subject: `[${claimNo}] - ${vessel} - Survey Appointment Request`,
       body:
-        `Dear Underwriters,\n\n` +
-        `We hereby provide initial notice of circumstances arising in a charter context that may give rise to liabilities and/or costs.\n\n` +
-        `Claim Ref: ${claimNumber}\nVessel: ${vessel}${imo}\nDate/Time (as advised): ${eventDate}\nLocation/Position: ${location}\n\n` +
-        `Initial description (as received):\n${desc}\n\n` +
-        `Please confirm coverage position and advise documents required. We will provide further updates.\n\n` +
-        `Best regards,\nNova Carriers\n(Claims Team)`,
-    });
-  }
-
-  drafts.push({
-    type: "SURVEYOR_APPOINTMENT",
-    subject: `[${claimNumber}] - ${vessel} - Survey Appointment Request`,
-    body:
-      `Dear Sir/Madam,\n\n` +
-      `Nova Carriers requests your attendance / appointment as surveyor in relation to the below incident.\n\n` +
-      `Claim Ref: ${claimNumber}\nVessel: ${vessel}\nIncident date: ${eventDate}\nLocation: ${location}\n\n` +
-      `Please confirm:\n1) Earliest attendance and ETA\n2) Information/documents required prior attendance\n3) Expected deliverables and timeline for preliminary and final report\n\n` +
-      `We will provide photographs, statements, and relevant extracts upon confirmation.\n\n` +
-      `Best regards,\nNova Carriers\n(Claims Team)`,
-  });
+        `Dear Sir/Madam,\n\n` +
+        `${company} requests your attendance / appointment as surveyor in relation to the below incident.\n\n` +
+        `Claim Ref: ${claimNo}\n` +
+        `Vessel: ${vessel}${imo}\n` +
+        `Incident date: ${when}\n` +
+        `Location: ${where}\n\n` +
+        `Please confirm:\n` +
+        `1) Earliest attendance and ETA\n` +
+        `2) Information/documents required prior attendance\n` +
+        `3) Expected deliverables and timeline for preliminary and final report\n\n` +
+        `We will provide photographs, statements, and relevant extracts upon confirmation.\n\n` +
+        `Best regards,\n${company}\n(Claims Team)`
+    },
+    {
+      type: "EVIDENCE_REQUEST_VESSEL",
+      subject: `[${claimNo}] - ${vessel} - Evidence / Documents Required`,
+      body:
+        `Master / Vessel Team,\n\n` +
+        `For Claim Ref: ${claimNo}, please provide the following at the earliest:\n\n` +
+        `- Statement of Facts / Master’s report and timeline\n` +
+        `- Deck log extracts and engine log extracts (relevant period)\n` +
+        `- VDR/S-VDR data preservation confirmation (if applicable)\n` +
+        `- Photographs/videos of damage and relevant area(s)\n` +
+        `- Pilot card, pilot details, tug details (if used)\n` +
+        `- Any port/terminal reports or correspondence\n\n` +
+        `Please confirm whether any third-party property was damaged and whether any pollution occurred.\n\n` +
+        `Regards,\n${company}\n(Claims Team)`
+    },
+    {
+      type: "INTERNAL_FINANCE_NOTE",
+      subject: `[${claimNo}] - ${vessel} - Finance Snapshot / Reserve & Cash-Out`,
+      body:
+        `Internal Finance Note\n\n` +
+        `Claim Ref: ${claimNo}\nVessel: ${vessel}\nCover(s): ${covers}\n\n` +
+        `Reserve (insurer view): ${fin.currency} ${fin.reserveEstimated}\n` +
+        `Owner cash-out paid: ${fin.currency} ${fin.cashOut}\n` +
+        `Deductible: ${fin.currency} ${fin.deductible}\n` +
+        `Expected recoverable: ${fin.currency} ${fin.recoverableExpected}\n` +
+        `Recovered to date: ${fin.currency} ${fin.recovered}\n` +
+        `Outstanding recovery: ${fin.currency} ${fin.outstandingRecovery}\n\n` +
+        `Notes:\n${fin.notes || "-"}\n`
+    },
+    {
+      type: "CHASE_REMINDER",
+      subject: `[${claimNo}] - ${vessel} - Follow-up / Chase`,
+      body:
+        `Dear All,\n\n` +
+        `Gentle reminder / follow-up in relation to Claim Ref ${claimNo} (${vessel}).\n\n` +
+        `Pending item(s):\n- [Insert pending item / report]\n\n` +
+        `Kindly provide an update and expected timeline for closure.\n\n` +
+        `Best regards,\n${company}\n(Claims Team)`
+    }
+  ];
 
   return drafts;
 }
 
-// ---------- Finance model (returns BOTH schemas) ----------
-function normalizeFinance(financeIn) {
-  const fin = financeIn || {};
-  const currency = fin.currency || "USD";
-
-  const reserveEstimated = safeNum(fin.reserveEstimated ?? fin.reserveEstimated);
-  const paid = safeNum(fin.paid ?? fin.cashOut ?? fin.cash_out ?? 0); // legacy paid
-  const deductible = safeNum(fin.deductible ?? 0);
-  const recovered = safeNum(fin.recovered ?? 0);
-
-  // Canonical “owner-view” fields
-  const cashOut = paid; // alias
-  const recoverableExpected = max0(paid - deductible);
-  const outstandingRecovery = max0(recoverableExpected - recovered);
-
-  // Legacy fields expected by older UI
-  const recoverable = recoverableExpected;
-  const outstanding = outstandingRecovery;
-
-  const notes = fin.notes || "";
-
-  return {
-    currency,
-    reserveEstimated,
-
-    // legacy fields
-    paid,
-    recoverable,
-    outstanding,
-
-    // canonical fields
-    cashOut,
-    deductible,
-    recoverableExpected,
-    recovered,
-    outstandingRecovery,
-
-    notes,
-  };
-}
-
-function claimSummary(claim) {
-  const fin = normalizeFinance(claim.finance || {});
-  const covers = Array.isArray(claim.covers) ? claim.covers : [];
-
-  return {
-    id: claim.id,
-    claimNumber: claim.claimNumber,
-    vesselName: claim.extraction?.vesselName || claim.vesselName || null,
-    eventDateText: claim.extraction?.eventDateText || claim.eventDateText || null,
-    locationText: claim.extraction?.locationText || claim.locationText || null,
-    progressStatus: claim.progressStatus || "Notification Received",
-    covers,
-
-    // keep both
-    currency: fin.currency,
-    reserveEstimated: fin.reserveEstimated,
-    paid: fin.paid,
-    deductible: fin.deductible,
-    recoverable: fin.recoverable,
-    recovered: fin.recovered,
-    outstanding: fin.outstanding,
-
-    // also provide canonical
-    cashOut: fin.cashOut,
-    recoverableExpected: fin.recoverableExpected,
-    outstandingRecovery: fin.outstandingRecovery,
-
-    createdAt: claim.createdAt,
-    updatedAt: claim.updatedAt,
-  };
-}
-
-// ---------- Claim number ----------
-function nextClaimNumber(allClaims, company) {
-  const year = new Date().getFullYear();
-  const prefix = `MC-NOVA-${year}-`;
-  const nums = allClaims
-    .map((c) => String(c.claimNumber || ""))
-    .filter((n) => n.startsWith(prefix))
-    .map((n) => parseInt(n.replace(prefix, ""), 10))
-    .filter((n) => Number.isFinite(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
-}
-
-// ---------- Public API used by controllers ----------
-async function createClaim({ company = "Nova Carriers", createdBy = "System", firstNotificationText = "" }) {
-  const claims = readAllClaims();
-  const id = uid();
-  const createdAt = nowIso();
-
-  const extraction = extractFromText(firstNotificationText);
-  const classification = classifyFromExtraction(extraction);
-
-  const covers = (classification?.covers || []).map((c) => c.type);
-
-  const claim = {
-    id,
-    claimNumber: nextClaimNumber(claims, company),
-    company,
-    createdAt,
-    createdBy,
-    updatedAt: createdAt,
-    progressStatus: "Notification Received",
-
-    extraction,
-    classification,
-
-    vesselName: extraction.vesselName || null,
-    eventDateText: extraction.eventDateText || null,
-    locationText: extraction.locationText || null,
-
-    covers,
-
-    actions: defaultActions(id, createdAt),
-    finance: normalizeFinance({ currency: "USD" }),
-    files: [],
-    statusLog: [
-      {
-        at: createdAt,
-        by: createdBy,
-        status: "Notification Received",
-        note: "Claim created from first notification.",
-      },
-    ],
-    auditTrail: [
-      {
-        at: createdAt,
-        by: createdBy,
-        action: "CLAIM_CREATED",
-        note: "Claim created from first notification text.",
-      },
-    ],
-  };
-
-  claims.unshift(claim);
-  writeAllClaims(claims);
-
-  return claim;
-}
-
-async function listClaims() {
-  const claims = readAllClaims();
-  return claims.map(claimSummary);
-}
-
-async function getClaim(id) {
-  const claims = readAllClaims();
-  const claim = claims.find((c) => c.id === id);
-  if (!claim) return null;
-
-  // normalize finance for detail too
-  claim.finance = normalizeFinance(claim.finance || {});
-  return claim;
-}
-
-async function patchProgress(id, { by = "System", progressStatus }) {
-  const claims = readAllClaims();
-  const idx = claims.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
-
-  const claim = claims[idx];
-  const at = nowIso();
-
-  claim.progressStatus = progressStatus || claim.progressStatus || "Updated";
-  claim.updatedAt = at;
-
-  claim.statusLog = Array.isArray(claim.statusLog) ? claim.statusLog : [];
-  claim.statusLog.push({ at, by, status: claim.progressStatus, note: "Progress updated" });
-
-  claim.auditTrail = Array.isArray(claim.auditTrail) ? claim.auditTrail : [];
-  claim.auditTrail.push({ at, by, action: "STATUS_UPDATED", note: `Progress set to: ${claim.progressStatus}` });
-
-  claims[idx] = claim;
-  writeAllClaims(claims);
-
-  return claim;
-}
-
-async function patchFinance(id, { by = "System", finance }) {
-  const claims = readAllClaims();
-  const idx = claims.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
-
-  const claim = claims[idx];
-  const at = nowIso();
-
-  // merge + normalize
-  const merged = { ...(claim.finance || {}), ...(finance || {}) };
-  claim.finance = normalizeFinance(merged);
-  claim.updatedAt = at;
-
-  claim.auditTrail = Array.isArray(claim.auditTrail) ? claim.auditTrail : [];
-  claim.auditTrail.push({
-    at,
-    by,
-    action: "FINANCE_UPDATED",
-    note: `Finance updated (paid=${claim.finance.paid}, deductible=${claim.finance.deductible}, recovered=${claim.finance.recovered}, outstanding=${claim.finance.outstandingRecovery})`,
-  });
-
-  claims[idx] = claim;
-  writeAllClaims(claims);
-
-  return claim;
-}
-
-async function patchAction(id, actionId, { by = "System", status, notes, reminderAt }) {
-  const claims = readAllClaims();
-  const idx = claims.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
-
-  const claim = claims[idx];
-  const at = nowIso();
-
-  claim.actions = Array.isArray(claim.actions) ? claim.actions : [];
-  const aIdx = claim.actions.findIndex((a) => a.id === actionId);
-  if (aIdx < 0) return null;
-
-  const action = claim.actions[aIdx];
-
-  if (status) action.status = status;
-  if (typeof notes === "string") action.notes = notes;
-  if (reminderAt !== undefined) action.reminderAt = reminderAt; // allow null
-
-  action.updatedAt = at;
-  claim.updatedAt = at;
-
-  claim.actions[aIdx] = action;
-
-  claim.auditTrail = Array.isArray(claim.auditTrail) ? claim.auditTrail : [];
-  claim.auditTrail.push({
-    at,
-    by,
-    action: "ACTION_UPDATED",
-    note: `Action updated: ${action.title} (status=${action.status})`,
-  });
-
-  claims[idx] = claim;
-  writeAllClaims(claims);
-
-  return action;
-}
-
-async function getDrafts(id) {
-  const claim = await getClaim(id);
-  if (!claim) return null;
-  return draftTemplatesForClaim(claim);
-}
-
-async function getDueReminders() {
-  const claims = readAllClaims();
+function getDueReminders() {
+  const claims = readClaims().map(ensureArrays);
   const now = Date.now();
 
-  const rows = [];
-
+  const due = [];
   for (const c of claims) {
-    const actions = Array.isArray(c.actions) ? c.actions : [];
-    for (const a of actions) {
-      if (!a.reminderAt) continue;
-      const t = Date.parse(a.reminderAt);
-      if (!Number.isFinite(t)) continue;
-      if (t <= now) {
+    const coverTypes =
+      Array.isArray(c.covers) ? c.covers : (c.classification?.covers || []).map((x) => x.type);
+
+    for (const a of c.actions || []) {
+      if (a && a.status !== "DONE" && a.reminderAt) {
+        const t = new Date(a.reminderAt).getTime();
+        if (!Number.isNaN(t) && t <= now) {
+          due.push({
+            claimId: c.id,
+            claimNumber: c.claimNumber,
+            vesselName: c.vesselName || c.extraction?.vesselName || null,
+            progressStatus: c.progressStatus,
+            coverTypes,
+            actionId: a.id,
+            actionTitle: a.title,
+            ownerRole: a.ownerRole,
+            reminderAt: a.reminderAt,
+            dueAt: a.dueAt,
+          });
+        }
+      }
+    }
+  }
+
+  // sort soonest reminder first
+  due.sort((x, y) => new Date(x.reminderAt) - new Date(y.reminderAt));
+  return due;
+}
+
+function getReminders() {
+  // “Upcoming” view: anything with reminderAt set and OPEN (done or not)
+  const claims = readClaims().map(ensureArrays);
+
+  const rows = [];
+  for (const c of claims) {
+    const coverTypes =
+      Array.isArray(c.covers) ? c.covers : (c.classification?.covers || []).map((x) => x.type);
+
+    for (const a of c.actions || []) {
+      if (a && a.reminderAt) {
         rows.push({
           claimId: c.id,
           claimNumber: c.claimNumber,
-          vesselName: c.extraction?.vesselName || c.vesselName || null,
+          vesselName: c.vesselName || c.extraction?.vesselName || null,
           progressStatus: c.progressStatus,
-          coverTypes: Array.isArray(c.covers) ? c.covers : [],
+          coverTypes,
           actionId: a.id,
           actionTitle: a.title,
           ownerRole: a.ownerRole,
           reminderAt: a.reminderAt,
-          dueAt: a.dueAt || null,
+          dueAt: a.dueAt,
+          status: a.status,
         });
       }
     }
   }
 
-  // soonest reminder first
-  rows.sort((x, y) => Date.parse(x.reminderAt) - Date.parse(y.reminderAt));
+  rows.sort((x, y) => new Date(x.reminderAt) - new Date(y.reminderAt));
   return rows;
 }
 
 module.exports = {
-  createClaim,
   listClaims,
+  createClaim,
   getClaim,
   patchProgress,
   patchFinance,
   patchAction,
   getDrafts,
   getDueReminders,
+  getReminders,
 };

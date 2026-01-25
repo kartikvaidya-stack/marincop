@@ -5,8 +5,8 @@
     "company": "Nova Carriers",
     "createdAt": "2026-01-24T13:54:25.461Z",
     "createdBy": "Kartik",
-    "updatedAt": "2026-01-24T13:55:29.063Z",
-    "progressStatus": "Notification Received",
+    "updatedAt": "2026-01-25T14:30:43.731Z",
+    "progressStatus": "Insurers Notified",
     "extraction": {
       "rawText": "MV Jal nidhi\ncollision at Sea\nLocation English Channel\nPollution\n15 jan 2026",
       "summary": "MV Jal nidhi\ncollision at Sea\nLocation English Channel\nPollution\n15 jan 2026",
@@ -98,8 +98,8 @@
         "dueAt": "2026-01-24T13:54:25.461Z",
         "status": "OPEN",
         "createdAt": "2026-01-24T13:54:25.461Z",
-        "updatedAt": "2026-01-24T13:54:25.461Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-25T14:16:11.979Z",
+        "reminderAt": "2026-01-28T14:16:00.000Z",
         "notes": ""
       },
       {
@@ -109,8 +109,8 @@
         "dueAt": "2026-01-25T13:54:25.461Z",
         "status": "OPEN",
         "createdAt": "2026-01-24T13:54:25.461Z",
-        "updatedAt": "2026-01-24T13:54:25.461Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-25T14:16:43.390Z",
+        "reminderAt": "2026-01-27T14:16:00.000Z",
         "notes": ""
       },
       {
@@ -120,8 +120,8 @@
         "dueAt": "2026-01-25T13:54:25.461Z",
         "status": "OPEN",
         "createdAt": "2026-01-24T13:54:25.461Z",
-        "updatedAt": "2026-01-24T13:54:25.461Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-25T14:27:07.011Z",
+        "reminderAt": "2026-01-29T14:27:00.000Z",
         "notes": ""
       },
       {
@@ -131,8 +131,8 @@
         "dueAt": "2026-01-25T13:54:25.461Z",
         "status": "OPEN",
         "createdAt": "2026-01-24T13:54:25.461Z",
-        "updatedAt": "2026-01-24T13:54:25.461Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-25T14:29:26.877Z",
+        "reminderAt": "2026-01-27T14:29:00.000Z",
         "notes": ""
       }
     ],
@@ -156,6 +156,12 @@
         "by": "Kartik",
         "status": "Notification Received",
         "note": "Claim created from first notification."
+      },
+      {
+        "at": "2026-01-25T14:30:43.731Z",
+        "by": "Kartik",
+        "status": "Insurers Notified",
+        "note": "Progress updated"
       }
     ],
     "auditTrail": [
@@ -182,6 +188,36 @@
         "by": "Kartik",
         "action": "ACTION_UPDATED",
         "note": "Action updated: Create claim file and preserve evidence (status=OPEN)"
+      },
+      {
+        "at": "2026-01-25T14:16:11.979Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Track updates and maintain status log (status=OPEN, reminderAt set)"
+      },
+      {
+        "at": "2026-01-25T14:16:43.390Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Identify third-party involvement and liability exposure (status=OPEN, reminderAt set)"
+      },
+      {
+        "at": "2026-01-25T14:27:07.011Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Obtain statements (Master/crew) and incident report (status=OPEN, reminderAt set)"
+      },
+      {
+        "at": "2026-01-25T14:29:26.877Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Notify relevant correspondents / local agents if needed (status=OPEN, reminderAt set)"
+      },
+      {
+        "at": "2026-01-25T14:30:43.731Z",
+        "by": "Kartik",
+        "action": "STATUS_UPDATED",
+        "note": "Progress set to: Insurers Notified"
       }
     ]
   },
@@ -191,7 +227,7 @@
     "company": "Nova Carriers",
     "createdAt": "2026-01-24T10:18:22.134Z",
     "createdBy": "Kartik",
-    "updatedAt": "2026-01-24T13:53:14.750Z",
+    "updatedAt": "2026-01-25T14:32:12.651Z",
     "progressStatus": "Settlement Negotiation",
     "extraction": {
       "rawText": "MV Medan Express\nLoss of anchor at Singapore\n21 January 2026, 1000 hrs.",
@@ -303,8 +339,8 @@
         "dueAt": "2026-01-25T10:18:22.134Z",
         "status": "OPEN",
         "createdAt": "2026-01-24T10:18:22.134Z",
-        "updatedAt": "2026-01-24T10:18:22.134Z",
-        "reminderAt": null,
+        "updatedAt": "2026-01-25T14:32:12.651Z",
+        "reminderAt": "2026-02-01T14:32:00.000Z",
         "notes": ""
       },
       {
@@ -455,6 +491,12 @@
         "by": "Kartik",
         "action": "STATUS_UPDATED",
         "note": "Progress set to: Settlement Negotiation"
+      },
+      {
+        "at": "2026-01-25T14:32:12.651Z",
+        "by": "Kartik",
+        "action": "ACTION_UPDATED",
+        "note": "Action updated: Obtain statements (Master/crew) and incident report (status=OPEN, reminderAt set)"
       }
     ]
   },

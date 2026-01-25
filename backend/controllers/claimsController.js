@@ -140,7 +140,7 @@ async function patchAction(req, res) {
       reminderAt: body.reminderAt,
     };
 
-    const updatedAction = await claimService.patchAction(id, actionId, patch);
+    const updatedAction = claimService.patchAction(id, actionId, patch);
     return res.json({ ok: true, data: updatedAction });
   } catch (err) {
     return sendErr(res, err);
@@ -153,7 +153,10 @@ async function patchAction(req, res) {
 async function getDrafts(req, res) {
   try {
     const id = req.params.id;
-    const drafts = await claimService.getDrafts(id);
+    const drafts = claimService.getDrafts(id);
+    if (!drafts || !Array.isArray(drafts)) {
+      return res.json({ ok: true, data: [] });
+    }
     return res.json({ ok: true, data: drafts });
   } catch (err) {
     return sendErr(res, err);
@@ -165,8 +168,7 @@ async function getDrafts(req, res) {
  */
 async function getDueReminders(req, res) {
   try {
-    const daysAhead = Number(req.query.daysAhead ?? 14);
-    const due = await remindersService.getDueReminders({ daysAhead });
+    const due = remindersService.getDueReminders();
     return res.json({ ok: true, data: due });
   } catch (err) {
     return sendErr(res, err);

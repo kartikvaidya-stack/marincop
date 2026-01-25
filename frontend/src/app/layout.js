@@ -24,7 +24,7 @@ function TopBar() {
         position: "sticky",
         top: 0,
         zIndex: 10,
-        background: "rgba(247, 249, 252, 0.92)",
+        background: "rgba(220, 230, 240, 0.95)",
         backdropFilter: "blur(10px)",
         borderBottom: "1px solid #EAECF0",
       }}
@@ -42,11 +42,6 @@ function TopBar() {
             <NavLink href="/finance">Finance</NavLink>
             <NavLink href="/reminders">Reminders</NavLink>
             <NavLink href="/insights">Insights</NavLink>
-          
-          </div>
-
-          <div style={{ marginLeft: "auto", color: "#667085", fontSize: 12 }}>
-            Light UI • Internal tool
           </div>
         </div>
       </div>
