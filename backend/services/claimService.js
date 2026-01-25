@@ -376,6 +376,14 @@ function patchFinance(id, { by, finance }) {
   const at = nowIso();
 
   const merged = { ...(c.finance || {}), ...(finance || {}) };
+  
+  // CRITICAL FIX: Don't preserve old recoverableExpected/outstandingRecovery
+  // when cashOut/deductible/recovered change. Force recalculation.
+  if (finance && (finance.cashOut !== undefined || finance.deductible !== undefined || finance.recovered !== undefined)) {
+    delete merged.recoverableExpected;
+    delete merged.outstandingRecovery;
+  }
+  
   c.finance = computeFinance(merged);
 
   // Keep top-level shortcuts aligned
