@@ -14,6 +14,8 @@ const {
   getReminders,
 } = require("../controllers/claimsController");
 
+const { generateDraftFromAction } = require("../controllers/draftsController");
+
 // LIST + CREATE
 router.get("/", listClaims);
 router.post("/", createClaim);
@@ -32,5 +34,6 @@ router.patch("/:id/actions/:actionId", patchAction);
 
 // DRAFTS
 router.get("/:id/drafts", getDrafts);
+router.post("/:id/draft-from-action", generateDraftFromAction);
 
 module.exports = router;

@@ -1,5 +1,186 @@
 [
   {
+    "id": "2684c416-62e2-44f5-be93-9927aea6a399",
+    "claimNumber": "MC-NOVA-2026-0019",
+    "company": "Nova Carriers",
+    "createdAt": "2026-01-25T15:51:55.204Z",
+    "createdBy": "Test User",
+    "updatedAt": "2026-01-25T15:52:31.498Z",
+    "progressStatus": "Notification Received",
+    "extraction": {
+      "rawText": "MV Test Vessel, Fire in engine room, 25 Jan 2026, off Singapore. Vessel on time charter. Estimated damage USD 500000",
+      "summary": "MV Test Vessel, Fire in engine room, 25 Jan 2026, off Singapore. Vessel on time charter. Estimated damage USD 500000",
+      "vesselName": null,
+      "imo": null,
+      "eventDateText": "25 Jan 2026",
+      "locationText": null,
+      "incidentKeywords": [
+        "fire",
+        "charter",
+        "time charter"
+      ],
+      "counterpartyText": null
+    },
+    "classification": {
+      "covers": [
+        {
+          "type": "Charterers Liability",
+          "confidence": 0.85,
+          "reasoning": "Charterer involvement CONFIRMED. Charterers Liability is PRIMARY cover (H&M does NOT apply to charterers)."
+        }
+      ]
+    },
+    "vesselName": null,
+    "eventDateText": "25 Jan 2026",
+    "locationText": null,
+    "covers": [
+      "Charterers Liability"
+    ],
+    "actions": [
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A1",
+        "title": "Create claim file and preserve evidence",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A2",
+        "title": "Confirm cover(s) and notify relevant insurers/club",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A3",
+        "title": "Collect supporting documents (log extracts, photos, reports)",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-26T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A4",
+        "title": "Appoint / confirm surveyor (if required)",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-26T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A5",
+        "title": "Establish initial reserve / cash-out and deductible impact",
+        "ownerRole": "Finance",
+        "dueAt": "2026-01-27T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A6",
+        "title": "Track updates and maintain status log",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-25T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A7",
+        "title": "Identify third-party involvement and liability exposure",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-26T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A8",
+        "title": "Obtain statements (Master/crew) and incident report",
+        "ownerRole": "Ops",
+        "dueAt": "2026-01-26T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      },
+      {
+        "id": "2684c416-62e2-44f5-be93-9927aea6a399-A9",
+        "title": "Notify relevant correspondents / local agents if needed",
+        "ownerRole": "Claims",
+        "dueAt": "2026-01-26T15:51:55.204Z",
+        "status": "OPEN",
+        "createdAt": "2026-01-25T15:51:55.204Z",
+        "updatedAt": "2026-01-25T15:51:55.204Z",
+        "reminderAt": null,
+        "notes": ""
+      }
+    ],
+    "finance": {
+      "currency": "USD",
+      "reserveEstimated": 500000,
+      "cashOut": 400000,
+      "paid": 400000,
+      "deductible": 100000,
+      "recoverableExpected": 300000,
+      "recoverable": 300000,
+      "recovered": 50000,
+      "outstandingRecovery": 250000,
+      "outstanding": 250000,
+      "notes": ""
+    },
+    "files": [],
+    "statusLog": [
+      {
+        "at": "2026-01-25T15:51:55.204Z",
+        "by": "Test User",
+        "status": "Notification Received",
+        "note": "Claim created from first notification."
+      }
+    ],
+    "auditTrail": [
+      {
+        "at": "2026-01-25T15:51:55.204Z",
+        "by": "Test User",
+        "action": "CLAIM_CREATED",
+        "note": "Claim created from first notification text."
+      },
+      {
+        "at": "2026-01-25T15:51:59.265Z",
+        "by": "Test User",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=500000, cashOut=400000, recovered=50000, outstandingRecovery=0)"
+      },
+      {
+        "at": "2026-01-25T15:52:31.498Z",
+        "by": "Test User",
+        "action": "FINANCE_UPDATED",
+        "note": "Finance updated (reserve=500000, cashOut=400000, recovered=50000, outstandingRecovery=250000)"
+      }
+    ]
+  },
+  {
     "id": "d5e087a1-1306-4c66-a5df-fe0f272fef36",
     "claimNumber": "MC-NOVA-2026-0018",
     "company": "Nova Carriers",

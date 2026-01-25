@@ -233,7 +233,7 @@ function classifyFromText(rawText) {
   return { covers: unique };
 }
 
-function defaultActions(claimId, createdAtIso) {
+function generateIncidentSpecificActions(claimId, createdAtIso, extraction = {}) {
   const base = (n, title, ownerRole, daysDue = 0) => {
     const due = new Date(createdAtIso);
     due.setDate(due.getDate() + daysDue);
@@ -251,17 +251,80 @@ function defaultActions(claimId, createdAtIso) {
     };
   };
 
-  return [
-    base(1, "Create claim file and preserve evidence", "Claims", 0),
-    base(2, "Confirm cover(s) and notify relevant insurers/club", "Claims", 0),
-    base(3, "Collect supporting documents (log extracts, photos, reports)", "Ops", 1),
-    base(4, "Appoint / confirm surveyor (if required)", "Claims", 1),
-    base(5, "Establish initial reserve / cash-out and deductible impact", "Finance", 2),
-    base(6, "Track updates and maintain status log", "Claims", 0),
-    base(7, "Identify third-party involvement and liability exposure", "Claims", 1),
-    base(8, "Obtain statements (Master/crew) and incident report", "Ops", 1),
-    base(9, "Notify relevant correspondents / local agents if needed", "Claims", 1),
-  ];
+  const actions = [];
+  
+  // Base actions (always included)
+  actions.push(base(1, "Create claim file and preserve evidence", "Claims", 0));
+  actions.push(base(2, "Confirm cover(s) and notify relevant insurers/club", "Claims", 0));
+  actions.push(base(3, "Collect supporting documents (log extracts, photos, reports)", "Ops", 1));
+  actions.push(base(5, "Establish initial reserve / cash-out and deductible impact", "Finance", 2));
+  actions.push(base(6, "Track updates and maintain status log", "Claims", 0));
+
+  // Incident-specific actions based on incident type
+  const incidentType = (extraction?.incidentType || "").toLowerCase();
+  const keywords = (extraction?.incidentKeywords || []).map(k => k.toLowerCase());
+  
+  let actionCounter = 10;
+  
+  if (incidentType.includes("fire") || incidentType.includes("explosion") || 
+      keywords.some(k => k.includes("fire") || k.includes("explosion"))) {
+    actions.push(base(actionCounter++, "Obtain fire investigation report and damage assessment", "Ops", 2));
+    actions.push(base(actionCounter++, "Confirm vessel class/flag requirements for repairs", "Technical", 1));
+    actions.push(base(actionCounter++, "Arrange temporary repairs if vessel needs to proceed", "Technical", 2));
+  }
+  
+  if (incidentType.includes("collision") || incidentType.includes("contact") ||
+      keywords.some(k => k.includes("collision") || k.includes("contact"))) {
+    actions.push(base(actionCounter++, "Identify third-party vessel and establish liability", "Claims", 1));
+    actions.push(base(actionCounter++, "Obtain Master's statement, crew interviews, and incident report", "Ops", 1));
+    actions.push(base(actionCounter++, "Obtain AIS/Radar data and witness statements", "Ops", 2));
+    actions.push(base(actionCounter++, "Notify P&I club and coordinate third-party recovery", "Claims", 0));
+  }
+  
+  if (incidentType.includes("grounding") || keywords.some(k => k.includes("grounding"))) {
+    actions.push(base(actionCounter++, "Confirm vessel refloating plan and salvage requirements", "Technical", 1));
+    actions.push(base(actionCounter++, "Obtain hydrographic survey and environmental compliance report", "Ops", 2));
+    actions.push(base(actionCounter++, "Arrange master's statement on navigation/weather conditions", "Ops", 1));
+  }
+  
+  if (incidentType.includes("pollution") || incidentType.includes("spill") ||
+      keywords.some(k => k.includes("pollution") || k.includes("spill"))) {
+    actions.push(base(actionCounter++, "Report to authorities and environmental agencies if required", "Claims", 0));
+    actions.push(base(actionCounter++, "Arrange pollution control measures and cleanup contractors", "Ops", 1));
+    actions.push(base(actionCounter++, "Obtain environmental impact assessment and remediation costs", "Finance", 3));
+  }
+  
+  if (incidentType.includes("machinery") || incidentType.includes("engine") ||
+      keywords.some(k => k.includes("machinery") || k.includes("engine"))) {
+    actions.push(base(actionCounter++, "Obtain repair quotations from qualified marine engineers", "Technical", 2));
+    actions.push(base(actionCounter++, "Confirm main engine/propulsion unit damage and repair timeline", "Technical", 1));
+    actions.push(base(actionCounter++, "Arrange spare parts sourcing if drydock required", "Technical", 2));
+  }
+  
+  if (incidentType.includes("injury") || incidentType.includes("fatality") ||
+      keywords.some(k => k.includes("injury") || k.includes("fatality"))) {
+    actions.push(base(actionCounter++, "Obtain medical report and crew injury details", "Ops", 0));
+    actions.push(base(actionCounter++, "Arrange legal counsel for accident investigation", "Claims", 1));
+    actions.push(base(actionCounter++, "Notify flag state and relevant maritime authorities", "Claims", 1));
+  }
+  
+  if (incidentType.includes("cargo") || keywords.some(k => k.includes("cargo"))) {
+    actions.push(base(actionCounter++, "Obtain cargo survey report and shipper contact details", "Ops", 1));
+    actions.push(base(actionCounter++, "Arrange cargo inspection and quantify loss/damage", "Ops", 2));
+  }
+
+  // P&I/Third-party specific actions
+  if (keywords.some(k => k.includes("contact") || k.includes("collision") || k.includes("pollution"))) {
+    actions.push(base(actionCounter++, "Identify third-party involvement and liability exposure", "Claims", 1));
+    actions.push(base(actionCounter++, "Notify relevant correspondents / local agents", "Claims", 1));
+  }
+
+  return actions;
+}
+
+function defaultActions(claimId, createdAtIso) {
+  // For backward compatibility, use generic actions
+  return generateIncidentSpecificActions(claimId, createdAtIso, {});
 }
 
 // ---------- Public API expected by controllers ----------
@@ -323,7 +386,7 @@ function createClaim({ createdBy, company, firstNotificationText }) {
     eventDateText: extraction.eventDateText,
     locationText: extraction.locationText,
     covers,
-    actions: defaultActions(id, createdAt),
+    actions: generateIncidentSpecificActions(id, createdAt, extraction),
     finance: fin,
     files: [],
     statusLog: [
