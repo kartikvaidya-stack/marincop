@@ -182,88 +182,43 @@ function extractBasics(rawText) {
 
 function classifyFromText(rawText) {
   const t = (rawText || "").toLowerCase();
-
   const covers = [];
   const pushCover = (type, confidence, reasoning) => covers.push({ type, confidence, reasoning });
 
-  // Charterers Liability detection
-  if (
-    t.includes("chartered") ||
-    t.includes("charterers") ||
-    t.includes("time charter") ||
-    t.includes("voyage charter") ||
-    t.includes("as charterer") ||
-    t.includes("we chartered")
-  ) {
-    pushCover(
-      "Charterers Liability",
-      0.82,
-      "Notification indicates chartered employment / charterer role; exposures typically include charterers’ liabilities and contractual indemnities."
-    );
+  // CRITICAL MARINE INSURANCE RULE:
+  // If Nova Carriers is a CHARTERER => ONLY Charterers Liability applies
+  // H&M (Hull & Machinery) is for vessel OWNERS, not charterers
+  const isCharterer = t.includes("chartered") || t.includes("charterers") || 
+                      t.includes("time charter") || t.includes("voyage charter") ||
+                      t.includes("as charterer") || t.includes("we chartered");
+
+  if (isCharterer) {
+    pushCover("Charterers Liability", 0.85,
+      "Charterer involvement CONFIRMED. Charterers Liability is PRIMARY cover (H&M does NOT apply to charterers).");
   }
 
-  // P&I indicators (third party)
-  if (
-    t.includes("pollution") ||
-    t.includes("spill") ||
-    t.includes("injury") ||
-    t.includes("death") ||
-    t.includes("contact") ||
-    t.includes("collision") ||
-    t.includes("berth") ||
-    t.includes("quay") ||
-    t.includes("pilot") ||
-    t.includes("stevedore")
-  ) {
-    pushCover(
-      "P&I",
-      0.85,
-      "Likely third-party liabilities (contact/collision, personal injury, pollution, damage to fixed/floating objects, pilot/stevedore involvement)."
-    );
+  // P&I indicators (third-party liabilities - applies regardless of role)
+  if (t.includes("pollution") || t.includes("spill") || t.includes("injury") || t.includes("death") ||
+      t.includes("contact") || t.includes("collision") || t.includes("berth") || t.includes("quay") ||
+      t.includes("pilot") || t.includes("stevedore")) {
+    pushCover("P&I", 0.85, "Third-party liabilities detected (collision, pollution, injury, etc.).");
   }
 
-  // H&M indicators (ship physical damage)
-  if (
-    t.includes("damage to hull") ||
-    t.includes("denting") ||
-    t.includes("shell plating") ||
-    t.includes("rudder") ||
-    t.includes("propeller") ||
-    t.includes("machinery") ||
-    t.includes("engine") ||
-    t.includes("grounding") ||
-    t.includes("fire") ||
-    t.includes("flooding")
-  ) {
-    pushCover(
-      "H&M",
-      0.78,
-      "Indications of physical damage to the vessel / machinery suggesting Hull & Machinery involvement."
-    );
+  // H&M indicators (physical ship damage) - ONLY suggest if NOT a charterer
+  if (!isCharterer && (t.includes("damage to hull") || t.includes("denting") || t.includes("shell plating") ||
+      t.includes("rudder") || t.includes("propeller") || t.includes("machinery") || t.includes("engine") ||
+      t.includes("grounding") || t.includes("fire") || t.includes("flooding"))) {
+    pushCover("H&M", 0.78, "Physical damage to vessel/machinery. Hull & Machinery applies to owners (not charterers).");
   }
 
-  // Cargo indicators
-  if (
-    t.includes("cargo") ||
-    t.includes("shortage") ||
-    t.includes("wet damage") ||
-    t.includes("contamination") ||
-    t.includes("hold fire") ||
-    t.includes("damage to cargo")
-  ) {
-    pushCover(
-      "Cargo",
-      0.72,
-      "Indications of cargo loss/damage and potential cargo-related exposures."
-    );
+  // Cargo indicators (applies to any role)
+  if (t.includes("cargo") || t.includes("shortage") || t.includes("wet damage") ||
+      t.includes("contamination") || t.includes("hold fire") || t.includes("damage to cargo")) {
+    pushCover("Cargo", 0.72, "Cargo loss/damage indicated.");
   }
 
   if (covers.length === 0) {
-    pushCover(
-      "To Be Confirmed",
-      0.5,
-      "Insufficient information to classify confidently; requires further details (role, damage, liabilities, cargo, pollution)."
-    );
+    pushCover("To Be Confirmed", 0.5, "Insufficient information to classify; requires further details.");
   }
 
   // Ensure unique types (avoid duplicates)

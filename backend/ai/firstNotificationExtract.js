@@ -141,6 +141,8 @@ async function aiExtractFirstNotification(rawText) {
     "Return ONLY valid JSON that matches the provided schema.",
     "If a field is unknown, return null (not an empty string).",
     "incidentKeywords should be short lower-case tags (e.g., contact, collision, grounding, pollution, injury, cargo, fire, machinery, weather).",
+    "For locationText: extract ANY location/port/city name mentioned, even if standalone (e.g., 'Balikpapan', 'off Singapore', 'at Hamburg'). Include maritime ports and geographic locations.",
+    "Common maritime locations: Singapore, Port Said, Rotterdam, Hamburg, Shanghai, Hong Kong, Dubai, Los Angeles, etc.",
   ].join("\n");
 
   const user = [
